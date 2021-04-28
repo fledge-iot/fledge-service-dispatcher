@@ -1,0 +1,203 @@
+/*
+ * Fledge Dispatcher API class for Dispatcher micro service.
+ *
+ * Copyright (c) 2021 Dianomic Systems
+ *
+ * Released under the Apache 2.0 Licence
+ *
+ * Author: Massimiliano Pinto
+ */
+#include "client_http.hpp"
+#include "server_http.hpp"
+#include "string_utils.h"
+#include "management_api.h"
+#include "dispatcher_api.h"
+
+DispatcherApi* DispatcherApi::m_instance = 0;
+
+using namespace std;
+using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
+using HttpClient = SimpleWeb::Client<SimpleWeb::HTTP>;
+
+
+/**
+ * Construct the singleton Dispatcher API
+ *
+ * @param    port	Listening port (0 = automatically set)
+ * @param    threads	Thread pool size of HTTP server
+ */
+DispatcherApi::DispatcherApi(const unsigned short port,
+				 const unsigned int threads)
+{
+	m_port = port;
+	m_threads = threads;
+	m_server = new HttpServer();
+	m_server->config.port = port;
+	m_server->config.thread_pool_size = threads;
+	m_thread = NULL;
+	m_logger = Logger::getLogger();
+	DispatcherApi::m_instance = this;
+}
+
+/**
+ * DispatcherAPi destructor
+ */
+DispatcherApi::~DispatcherApi()
+{
+	delete m_server;
+	delete m_thread;
+}
+
+/**
+ * Return the singleton instance of the Dispatcher API class
+ */
+DispatcherApi* DispatcherApi::getInstance()
+{
+	if (m_instance == NULL)
+	{
+		m_instance = new DispatcherApi(0, 1);
+	}
+	return m_instance;
+}
+
+/**
+ * Return the current listener port
+ *
+ * @return	The current listener port
+ */
+unsigned short DispatcherApi::getListenerPort()
+{
+	return m_server->getLocalPort();
+}
+
+/**
+ * Method for HTTP server, called by a dedicated thread
+ */
+void startService()
+{
+	DispatcherApi::getInstance()->startServer();
+}
+
+/**
+ * Start the HTTP server
+ */
+void DispatcherApi::start() {
+	m_thread = new thread(startService);
+}
+
+/**
+ * Start method for HTTP server
+ */
+void DispatcherApi::startServer() {
+	m_server->start();
+}
+
+/**
+ * Stop method for HTTP server
+ */
+void DispatcherApi::stopServer() {
+	m_server->stop();
+}
+
+/**
+ * API stop entery point
+ */
+void DispatcherApi::stop()
+{
+	this->stopServer();
+}
+
+/**
+ * Wait for the HTTP server to shutdown
+ */
+void DispatcherApi::wait() {
+	m_thread->join();
+}
+
+/**
+ * Handle a bad URL endpoint call
+ */
+void DispatcherApi::defaultResource(shared_ptr<HttpServer::Response> response,
+				      shared_ptr<HttpServer::Request> request)
+{
+	string payload("{ \"error\" : \"Unsupported URL: " + request->path + "\" }");
+	respond(response,
+		SimpleWeb::StatusCode::client_error_bad_request,
+		payload);
+}
+
+/**
+ * Wrapper for not handled URLS
+ */
+void defaultWrapper(shared_ptr<HttpServer::Response> response,
+		    shared_ptr<HttpServer::Request> request)
+{
+	DispatcherApi *api = DispatcherApi::getInstance();
+	api->defaultResource(response, request);
+}
+
+/**
+ * Initialise the API entry points for the common data resource and
+ * the readings resource.
+ */
+void DispatcherApi::initResources()
+{
+	// Handle errors
+	m_server->default_resource["GET"] = defaultWrapper;
+	m_server->default_resource["POST"] = defaultWrapper;
+	m_server->default_resource["DELETE"] = defaultWrapper;
+}
+
+/**
+ * Handle a exception by sendign back an internal error
+ *
+  *
+ * @param response	The response stream to send the response on.
+ * @param ex		The current exception caught.
+ */
+void DispatcherApi::internalError(shared_ptr<HttpServer::Response> response,
+				    const exception& ex)
+{
+	string payload = "{ \"Exception\" : \"";
+
+	payload = payload + string(ex.what());
+	payload = payload + "\"";
+
+	m_logger->error("DispatcherApi Internal Error: %s\n", ex.what());
+
+	this->respond(response,
+		      SimpleWeb::StatusCode::server_error_internal_server_error,
+		      payload);
+}
+
+/**
+ * Construct an HTTP response with the 200 OK return code using the payload
+ * provided.
+ *
+ * @param response	The response stream to send the response on
+ * @param payload	The payload to send
+ */
+void DispatcherApi::respond(shared_ptr<HttpServer::Response> response,
+			      const string& payload)
+{
+	*response << "HTTP/1.1 200 OK\r\nContent-Length: "
+		  << payload.length() << "\r\n"
+		  <<  "Content-type: application/json\r\n\r\n" << payload;
+}
+
+/**
+ * Construct an HTTP response with the specified return code using the payload
+ * provided.
+ *
+ * @param response	The response stream to send the response on
+ * @param code		The HTTP esponse code to send
+ * @param payload	The payload to send
+ */
+void DispatcherApi::respond(shared_ptr<HttpServer::Response> response,
+			      SimpleWeb::StatusCode code,
+			      const string& payload)
+{
+	*response << "HTTP/1.1 " << status_code(code) << "\r\nContent-Length: "
+		  << payload.length() << "\r\n"
+		  <<  "Content-type: application/json\r\n\r\n" << payload;
+}
