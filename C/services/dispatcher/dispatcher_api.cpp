@@ -5,17 +5,22 @@
  *
  * Released under the Apache 2.0 Licence
  *
- * Author: Massimiliano Pinto
+ * Author: Massimiliano Pinto, Mark Riddoch
  */
 #include "client_http.hpp"
 #include "server_http.hpp"
 #include "string_utils.h"
 #include "management_api.h"
 #include "dispatcher_api.h"
+#include <rapidjson/document.h>
+#include <dispatcher_service.h>
+#include <controlrequest.h>
+#include <plugin_api.h>
 
 DispatcherApi* DispatcherApi::m_instance = 0;
 
 using namespace std;
+using namespace rapidjson;
 using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
 using HttpClient = SimpleWeb::Client<SimpleWeb::HTTP>;
 
@@ -81,7 +86,8 @@ void startService()
 /**
  * Start the HTTP server
  */
-void DispatcherApi::start() {
+void DispatcherApi::start(DispatcherService *service) {
+	m_service = service;
 	m_thread = new thread(startService);
 }
 
@@ -115,6 +121,100 @@ void DispatcherApi::wait() {
 }
 
 /**
+ * Handle a write request call
+ */
+void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
+				      shared_ptr<HttpServer::Request> request)
+{
+	string destination, name, key, value;
+	string payload = request->content.string();
+	try {
+		Document doc;
+		ParseResult result = doc.Parse(payload.c_str());
+		if (result)
+		{
+			if (doc.HasMember("destination") && doc["destination"].IsString())
+			{
+				destination = doc["destination"].GetString();
+			}
+			else
+			{
+				string responsePayload = QUOTE({ "message" : "Missing 'destination' in write payload" });
+				respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+				return;
+			}
+			if (doc.HasMember("name") && doc["name"].IsString())
+			{
+				name = doc["name"].GetString();
+			}
+			else if (destination.compare("script") == 0)
+			{
+				string responsePayload = QUOTE({ "message" : "Missing script name in write payload" });
+				respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+				return;
+			}
+			else if (destination.compare("service") == 0)
+			{
+				string responsePayload = QUOTE({ "message" : "Missing service name in write payload" });
+				respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+				return;
+			}
+			if (doc.HasMember("write") && doc["write"].IsObject())
+			{
+				for (auto& kv : doc["write"].GetObject())
+				{
+					key = kv.name.GetString();
+					if (kv.value.IsString())
+					{
+						value = kv.value.GetString();
+						ControlRequest *writeRequest = NULL;
+						if (destination.compare("service"))
+						{
+							writeRequest = new ControlWriteServiceRequest(name, key, value); 
+						}
+						else if (destination.compare("script"))
+						{
+							writeRequest = new ControlWriteScriptRequest(name, key, value); 
+						}
+						else if (destination.compare("broadcast"))
+						{
+							writeRequest = new ControlWriteBroadcastRequest(key, value); 
+						}
+						if (writeRequest)
+						{
+							queueRequest(writeRequest);
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			string responsePayload = QUOTE({ "message" : "Failed to parse request payload" });
+			respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+		}
+		
+	} catch (exception &e) {
+		char buffer[80];
+		snprintf(buffer, sizeof(buffer), "\"Exception: %s\"", e.what());
+		string responsePayload = QUOTE({ "message" : buffer });
+		respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+	}
+}
+
+/**
+ * Handle a operation request call
+ */
+void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
+				      shared_ptr<HttpServer::Request> request)
+{
+	string payload("{ \"error\" : \"Unsupported URL: " + request->path + "\" }");
+	respond(response,
+		SimpleWeb::StatusCode::client_error_bad_request,
+		payload);
+}
+
+/**
  * Handle a bad URL endpoint call
  */
 void DispatcherApi::defaultResource(shared_ptr<HttpServer::Response> response,
@@ -128,12 +228,41 @@ void DispatcherApi::defaultResource(shared_ptr<HttpServer::Response> response,
 
 /**
  * Wrapper for not handled URLS
+ *
+ * @param response	The response the should be sent
+ * @param request	The API request
  */
-void defaultWrapper(shared_ptr<HttpServer::Response> response,
+static void defaultWrapper(shared_ptr<HttpServer::Response> response,
 		    shared_ptr<HttpServer::Request> request)
 {
 	DispatcherApi *api = DispatcherApi::getInstance();
 	api->defaultResource(response, request);
+}
+
+/**
+ * Wrapper for write operation API entry point
+ *
+ * @param response	The response the should be sent
+ * @param request	The API request
+ */
+static void writeWrapper(shared_ptr<HttpServer::Response> response,
+		    shared_ptr<HttpServer::Request> request)
+{
+	DispatcherApi *api = DispatcherApi::getInstance();
+	api->write(response, request);
+}
+
+/**
+ * Wrapper for operation API entry point
+ *
+ * @param response	The response the should be sent
+ * @param request	The API request
+ */
+static void operationWrapper(shared_ptr<HttpServer::Response> response,
+		    shared_ptr<HttpServer::Request> request)
+{
+	DispatcherApi *api = DispatcherApi::getInstance();
+	api->operation(response, request);
 }
 
 /**
@@ -146,6 +275,8 @@ void DispatcherApi::initResources()
 	m_server->default_resource["GET"] = defaultWrapper;
 	m_server->default_resource["POST"] = defaultWrapper;
 	m_server->default_resource["DELETE"] = defaultWrapper;
+	m_server->resource[DISPATCH_WRITE]["POST"] = writeWrapper;
+	m_server->resource[DISPATCH_OPERATION]["POST"] = operationWrapper;
 }
 
 /**
@@ -200,4 +331,15 @@ void DispatcherApi::respond(shared_ptr<HttpServer::Response> response,
 	*response << "HTTP/1.1 " << status_code(code) << "\r\nContent-Length: "
 		  << payload.length() << "\r\n"
 		  <<  "Content-type: application/json\r\n\r\n" << payload;
+}
+
+/**
+ * Queue a request to be executed by the execution threads of the dispatcher service
+ *
+ * @param request	The request to queue
+ * @return bool		True if the request wa successfully queued
+ */
+bool DispatcherApi::queueRequest(ControlRequest *request)
+{
+	return m_service->queue(request);
 }
