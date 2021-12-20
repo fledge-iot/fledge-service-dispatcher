@@ -161,30 +161,23 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 			}
 			if (doc.HasMember("write") && doc["write"].IsObject())
 			{
-				for (auto& kv : doc["write"].GetObject())
+				KVList values(doc["write"]);
+				ControlRequest *writeRequest = NULL;
+				if (destination.compare("service"))
 				{
-					key = kv.name.GetString();
-					if (kv.value.IsString())
-					{
-						value = kv.value.GetString();
-						ControlRequest *writeRequest = NULL;
-						if (destination.compare("service"))
-						{
-							writeRequest = new ControlWriteServiceRequest(name, key, value); 
-						}
-						else if (destination.compare("script"))
-						{
-							writeRequest = new ControlWriteScriptRequest(name, key, value); 
-						}
-						else if (destination.compare("broadcast"))
-						{
-							writeRequest = new ControlWriteBroadcastRequest(key, value); 
-						}
-						if (writeRequest)
-						{
-							queueRequest(writeRequest);
-						}
-					}
+					writeRequest = new ControlWriteServiceRequest(name, values); 
+				}
+				else if (destination.compare("script"))
+				{
+					writeRequest = new ControlWriteScriptRequest(name, values); 
+				}
+				else if (destination.compare("broadcast"))
+				{
+					writeRequest = new ControlWriteBroadcastRequest(values); 
+				}
+				if (writeRequest)
+				{
+					queueRequest(writeRequest);
 				}
 			}
 		}

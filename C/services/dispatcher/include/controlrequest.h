@@ -14,7 +14,7 @@
  * dispatcher micro service.
  */
 #include <string>
-#include <vector>
+#include <kvlist.h>
 
 class DispatcherService;
 
@@ -32,14 +32,12 @@ class ControlRequest {
  */
 class WriteControlRequest : public ControlRequest {
 	public:
-		WriteControlRequest(const std::string& key, const std::string& value) :
-			m_key(key), m_value(value)
+		WriteControlRequest(KVList& values) : m_values(values)
 		{
 		};
 		virtual void execute(DispatcherService *) = 0;
 	protected:
-		const std::string		m_key;
-		const std::string		m_value;
+		KVList				m_values;
 };
 
 /**
@@ -47,10 +45,9 @@ class WriteControlRequest : public ControlRequest {
  */
 class ControlWriteServiceRequest : public WriteControlRequest {
 	public:
-		ControlWriteServiceRequest(const std::string& service,
-				const std::string& key,
-				const std::string& value) : m_service(service),
-					WriteControlRequest(key, value)
+		ControlWriteServiceRequest(const std::string& service, KVList& values) :
+		       			m_service(service),
+					WriteControlRequest(values)
 		{
 		};
 		void		execute(DispatcherService *);
@@ -63,10 +60,9 @@ class ControlWriteServiceRequest : public WriteControlRequest {
  */
 class ControlWriteScriptRequest : public WriteControlRequest {
 	public:
-		ControlWriteScriptRequest(const std::string& script,
-				const std::string& key,
-				const std::string& value) : m_scriptName(script),
-					WriteControlRequest(key, value)
+		ControlWriteScriptRequest(const std::string& script, KVList& values) :
+					m_scriptName(script),
+					WriteControlRequest(values)
 		{
 		};
 		void		execute(DispatcherService *);
@@ -79,9 +75,8 @@ class ControlWriteScriptRequest : public WriteControlRequest {
  */
 class ControlWriteBroadcastRequest : public WriteControlRequest {
 	public:
-		ControlWriteBroadcastRequest( const std::string& key,
-					const std::string& value) :
-						WriteControlRequest(key, value)
+		ControlWriteBroadcastRequest(KVList& values) :
+						WriteControlRequest(values)
 		{
 		};
 		void		execute(DispatcherService *);
@@ -92,17 +87,14 @@ class ControlWriteBroadcastRequest : public WriteControlRequest {
  */
 class ControlOperationRequest : public ControlRequest {
 	public:
-		ControlOperationRequest(const std::string& operation) :
-			m_operation(operation)
+		ControlOperationRequest(const std::string& operation, KVList& parameters) :
+			m_operation(operation), m_parameters(parameters)
 		{
 		};
-		ControlOperationRequest(const std::string& operation,
-				std::vector<std::pair<std::string, std::string> > parameters);
 		virtual void execute(DispatcherService *) = 0;
 	protected:
 		const std::string		m_operation;
-		std::vector<std::pair<std::string, std::string> >
-						m_parameters;
+		KVList				m_parameters;
 };
 
 /**
@@ -111,15 +103,9 @@ class ControlOperationRequest : public ControlRequest {
 class ControlOperationServiceRequest : public ControlOperationRequest {
 	public:
 		ControlOperationServiceRequest(const std::string& operation, 
-				const std::string& service) : m_service(service),
-					ControlOperationRequest(operation)
-		{
-		};
-		ControlOperationServiceRequest(const std::string& operation, 
-				const std::string& service,
-				std::vector<std::pair<std::string, std::string> > parameters) :
+				const std::string& service, KVList& parameters):
 					m_service(service),
-					ControlOperationRequest(operation)
+					ControlOperationRequest(operation, parameters)
 		{
 		};
 		void execute(DispatcherService *);
@@ -133,13 +119,8 @@ class ControlOperationServiceRequest : public ControlOperationRequest {
  */
 class ControlOperationBroadcastRequest : public ControlOperationRequest {
 	public:
-		ControlOperationBroadcastRequest(const std::string& operation) :
-					ControlOperationRequest(operation)
-		{
-		};
-		ControlOperationBroadcastRequest(const std::string& operation,
-				std::vector<std::pair<std::string, std::string> > parameters) :
-					ControlOperationRequest(operation)
+		ControlOperationBroadcastRequest(const std::string& operation, KVList& parameters) :
+					ControlOperationRequest(operation, parameters)
 		{
 		};
 		void execute(DispatcherService *);
