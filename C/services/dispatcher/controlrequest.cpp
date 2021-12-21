@@ -33,6 +33,7 @@ void ControlWriteServiceRequest::execute(DispatcherService *service)
  */
 void ControlWriteBroadcastRequest::execute(DispatcherService *service)
 {
+	// TODO Implement broadcast mechamism
 }
 
 /**
@@ -42,6 +43,7 @@ void ControlWriteBroadcastRequest::execute(DispatcherService *service)
  */
 void ControlWriteScriptRequest::execute(DispatcherService *service)
 {
+	// TODO Implement script execution
 }
 
 
@@ -72,4 +74,5 @@ void ControlOperationServiceRequest::execute(DispatcherService *service)
  */
 void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 {
+	// TODO Imolement broadcast mechanism
 }

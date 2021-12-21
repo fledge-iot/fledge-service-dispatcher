@@ -17,6 +17,7 @@
 #include <map>
 #include <chrono>
 #include <thread>
+#include <kvlist.h>
 
 class DispatcherService;
 class ScriptStep;
@@ -55,16 +56,14 @@ class ScriptStep {
  */
 class WriteScriptStep : public ScriptStep {
 	public:
-		WriteScriptStep(const std::string& service,
-				std::vector<std:pair<std::string, std::string> > values) :
+		WriteScriptStep(const std::string& service, const KVList& values) :
 						m_service(service), m_values(values)
 				{
 				};
 		bool		execute(DispatcherService *);
 	private:
 		const std::string	m_service;
-		const std::vector<std::pair<std::string, std::string> >
-					m_values;
+		const KVList		m_values;
 };
 
 /**
@@ -72,16 +71,14 @@ class WriteScriptStep : public ScriptStep {
  */
 class OperationScriptStep : public ScriptStep {
 	public:
-		OperationScriptStep(const std::string& operation,
-				std::vector<std::pair<std::string, std::string> > parameters) :
+		OperationScriptStep(const std::string& operation, const KVList& parameters) :
 					m_operation(operation), m_parameters(parameters)
 				{
 				};
 		bool		execute(DispatcherService *);
 	private:
 		const std::string	m_operation;
-		std::vector<std::pair<std::string, std::string> >
-					m_parameters;
+		const KVList		m_parameters;
 };
 
 /**
