@@ -24,6 +24,16 @@
 using namespace std;
 
 /**
+ * Thread entry point for the worker threads used to execute the 
+ * control functions
+ */
+static void worker_thread(void *data)
+{
+	DispatcherService *service = (DispatcherService *)data;
+	service->worker();
+}
+
+/**
  * Constructor for the DispatcherService class
  *
  * This class handles all Dispatcher server components.
@@ -33,7 +43,8 @@ using namespace std;
 DispatcherService::DispatcherService(const string& myName, const string& token) :
 					 m_name(myName),
 					 m_shutdown(false),
-					 m_token(token)
+					 m_token(token),
+					 m_stopping(false)
 {
 	// Default to a dynamic port
 	unsigned short servicePort = 0;
@@ -49,7 +60,7 @@ DispatcherService::DispatcherService(const string& myName, const string& token) 
 	m_api = new DispatcherApi(servicePort, threads);
 
 	// Set NULL for other resources
-	m_managerClient = NULL;
+	m_managementClient = NULL;
 	m_managementApi = NULL;
 }
 
@@ -59,7 +70,7 @@ DispatcherService::DispatcherService(const string& myName, const string& token) 
 DispatcherService::~DispatcherService()
 {
 	delete m_api;
-	delete m_managerClient;
+	delete m_managementClient;
 	delete m_managementApi;
 	delete m_logger;
 }
@@ -95,7 +106,7 @@ bool DispatcherService::start(string& coreAddress,
         m_api->initResources();
 
         // Start the NotificationApi on service port
-	m_api->start();
+	m_api->start(this);
 
 	// Allow time for the listeners to start before we continue
 	while(m_api->getListenerPort() == 0)
@@ -104,8 +115,8 @@ bool DispatcherService::start(string& coreAddress,
 	}
 
 	// Get management client
-	m_managerClient = new ManagementClient(coreAddress, corePort);
-	if (!m_managerClient)
+	m_managementClient = new ManagementClient(coreAddress, corePort);
+	if (!m_managementClient)
 	{
 		m_logger->fatal("Dispacther service '" + m_name + \
 				"' can not connect to Fledge at " + \
@@ -118,7 +129,7 @@ bool DispatcherService::start(string& coreAddress,
 	// Create a category with Dispatcher name
 	DefaultConfigCategory dispatcherServerConfig(DISPATCHER_CATEGORY, string("{}"));
 	dispatcherServerConfig.setDescription("Dispatcher server " + string(DISPATCHER_CATEGORY));
-	if (!m_managerClient->addCategory(dispatcherServerConfig, true))
+	if (!m_managementClient->addCategory(dispatcherServerConfig, true))
 	{
 		m_logger->fatal("Dispatcher service '" + m_name + \
 				"' can not connect to Fledge ConfigurationManager at " + \
@@ -145,11 +156,11 @@ bool DispatcherService::start(string& coreAddress,
 						    "Maximun number of dispatcher threads");
 
 	// Create/Update category name (we pass keep_original_items=true)
-	if (m_managerClient->addCategory(defConfigAdvanced, true))
+	if (m_managementClient->addCategory(defConfigAdvanced, true))
 	{
 		vector<string> children1;
 		children1.push_back(advancedCatName);
-		m_managerClient->addChildCategories(DISPATCHER_CATEGORY, children1);
+		m_managementClient->addChildCategories(DISPATCHER_CATEGORY, children1);
 	}
 
 	// Register this dispatcher service with Fledge core
@@ -163,7 +174,7 @@ bool DispatcherService::start(string& coreAddress,
 			     managementListener,	// Management port
 			     m_token);			// Token
 
-	if (!m_managerClient->registerService(record))
+	if (!m_managementClient->registerService(record))
 	{
 		m_logger->fatal("Unable to register service "
 				"\"Dispatcher\" for service '" + m_name + "'");
@@ -176,7 +187,7 @@ bool DispatcherService::start(string& coreAddress,
 	registerCategory(DISPATCHER_CATEGORY);
 	registerCategory(advancedCatName);
 
-	ConfigCategory category = m_managerClient->getCategory(advancedCatName);
+	ConfigCategory category = m_managementClient->getCategory(advancedCatName);
 	if (category.itemExists("logLevel"))
 	{
 		m_logger->setMinLevel(category.getValue("logLevel"));
@@ -197,7 +208,7 @@ bool DispatcherService::start(string& coreAddress,
 
 	// Get Storage service
 	ServiceRecord storageInfo("", "Storage");
-	if (!m_managerClient->getService(storageInfo))
+	if (!m_managementClient->getService(storageInfo))
 	{
 		m_logger->fatal("Unable to find Fledge storage "
 				"connection info for service '" + m_name + "'");
@@ -205,7 +216,7 @@ bool DispatcherService::start(string& coreAddress,
 		this->cleanupResources();
 
 		// Unregister from Fledge
-		m_managerClient->unregisterService();
+		m_managementClient->unregisterService();
 
 		return false;
 	}
@@ -218,10 +229,15 @@ bool DispatcherService::start(string& coreAddress,
 				    storageInfo.getPort());
 	m_storage = &storageClient;
 
-	m_managerClient->addAuditEntry("DSPST",
+	m_managementClient->addAuditEntry("DSPST",
 					"INFORMATION",
 					"{\"name\": \"" + m_name + "\"}");
 
+	// Start the worker threads
+	for (int i = 0; i < m_worker_threads; i++)
+	{
+		new thread(worker_thread, this);
+	}
 	// .... wait until shutdown ...
 
 	// Wait for all the API threads to complete
@@ -233,7 +249,7 @@ bool DispatcherService::start(string& coreAddress,
 	// - all xyz already unregistered
 
 	// Unregister from storage service
-	m_managerClient->unregisterService();
+	m_managementClient->unregisterService();
 
 	// Stop management API
 	m_managementApi->stop();
@@ -242,7 +258,7 @@ bool DispatcherService::start(string& coreAddress,
 
 	m_logger->info("Dispatcher service '" + m_name + "' shutdown completed.");
 
-	m_managerClient->addAuditEntry("DSPSD",
+	m_managementClient->addAuditEntry("DSPSD",
 					"INFORMATION",
 					"{\"name\": \"" + m_name + "\"}");
 
@@ -255,6 +271,7 @@ bool DispatcherService::start(string& coreAddress,
  */
 void DispatcherService::stop()
 {
+	m_stopping = true;
 	// Stop the DispatcherApi
 	m_api->stop();
 }
@@ -315,12 +332,108 @@ void DispatcherService::configChange(const string& categoryName,
  */
 void DispatcherService::registerCategory(const string& categoryName)
 {
-	ConfigHandler* configHandler = ConfigHandler::getInstance(m_managerClient);
+	ConfigHandler* configHandler = ConfigHandler::getInstance(m_managementClient);
 	// Call registerCategory only once
 	if (configHandler &&
 	    m_registerCategories.find(categoryName) == m_registerCategories.end())
 	{
 		configHandler->registerCategory(this, categoryName);
 		m_registerCategories[categoryName] = true;
+	}
+}
+
+/**
+ * Add a request to the request queue. The request parameter shoudl have been created
+ * via new and will be deleted upon copmpletion of the request.
+ *
+ * @param request	The request to add to the queue
+ * @return bool		Return true if the request was added to the queue
+ */
+bool DispatcherService::queue(ControlRequest *request)
+{
+	lock_guard<mutex> guard(m_mutex);
+	m_requests.push(request);
+	m_cv.notify_all();
+	return true;
+}
+
+/**
+ * Return the nextr request to process or NULL if the service is shutting down
+ *
+ * @return ControlRequest*	The next request to process
+ */
+ControlRequest *DispatcherService::getRequest()
+{
+	unique_lock<mutex> lock(m_mutex);
+	while (m_requests.empty())
+	{
+		if (m_stopping)
+			return NULL;
+		m_cv.wait(lock);
+	}
+	ControlRequest *ret = m_requests.front();
+	m_requests.pop();
+	return ret;
+}
+
+/**
+ * Worker thread that executes the control functions
+ */
+void DispatcherService::worker()
+{
+ControlRequest *request;
+
+	while ((request = getRequest()) != NULL)
+	{
+		request->execute(this);
+		delete request;
+	}
+}
+
+/**
+ * Send a specified JSON payload to the service API of a specified service.
+ * Note this will execute a PUT operation on the service API of the specified
+ * service.
+ *
+ * @param serviceName	The name of the service to send to
+ * @param url		The url path component to send to on the service API of the service
+ * @param payload	The JSON payload to send
+ * @return bool		True if the payload was delivered to the service
+ */
+bool DispatcherService::sendToService(const string& serviceName, const string& url, const string& payload)
+{
+	try {
+		ServiceRecord service(serviceName);
+		if (!m_managementClient->getService(service))
+		{
+			Logger::getLogger()->error("Unable to find service '%s'", serviceName.c_str());
+			return false;
+		}
+		string address = service.getAddress();
+		unsigned short port = service.getPort();
+		char addressAndPort[80];
+		snprintf(addressAndPort, sizeof(addressAndPort), "%s:%d", address.c_str(), port);
+		SimpleWeb::Client<SimpleWeb::HTTP> http(addressAndPort);
+
+		try {
+			SimpleWeb::CaseInsensitiveMultimap headers = {{"Content-Type", "application/json"}};
+			auto res = http.request("PUT", url, payload, headers);
+			if (res->status_code.compare("200 OK"))
+			{
+				Logger::getLogger()->error("Failed to send set point operation to service %s, %s",
+							serviceName.c_str(), res->status_code.c_str());
+				return false;
+			}
+		} catch (exception& e) {
+			Logger::getLogger()->error("Failed to send set point operation to service %s, %s",
+						serviceName.c_str(), e.what());
+			return false;
+		}
+		return true;
+	}
+	catch (exception &e) {
+		Logger::getLogger()->error("Failed to send to service %s, %s: %s",
+				serviceName.c_str(), url.c_str(), e.what());
+		return false;
 	}
 }
