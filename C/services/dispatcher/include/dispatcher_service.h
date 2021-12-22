@@ -16,6 +16,10 @@
 #include <reading.h>
 #include <storage_client.h>
 #include <dispatcher_api.h>
+#include <controlrequest.h>
+#include <mutex>
+#include <condition_variable>
+#include <queue>
 
 #define SERVICE_NAME		"Fledge Dispatcher"
 #define SERVICE_TYPE		"Dispatcher"
@@ -37,20 +41,31 @@ class DispatcherService : public ServiceHandler
 		void			configChange(const std::string&,
 						     const std::string&);
 		void			registerCategory(const std::string& categoryName);
-		ManagementClient*	getManagementClient() { return m_managerClient; };
+		ManagementClient*	getManagementClient() { return m_managementClient; };
 		StorageClient*		getStorageClient() { return m_storage; };
+		bool			queue(ControlRequest *request);
+		void			worker();
+		bool			sendToService(const std::string& service, 
+						const std::string& url, const std::string& payload);
 
 	private:
-		const std::string	m_name;
-		Logger*			m_logger;
-		bool			m_shutdown;
-		DispatcherApi*		m_api;
-		ManagementClient* 	m_managerClient;
-		ManagementApi*		m_managementApi;
-		StorageClient*		m_storage;
+		ControlRequest		*getRequest();
+
+	private:
+		const std::string		m_name;
+		Logger*				m_logger;
+		bool				m_shutdown;
+		DispatcherApi*			m_api;
+		ManagementClient* 		m_managementClient;
+		ManagementApi*			m_managementApi;
+		StorageClient*			m_storage;
 		std::map<std::string, bool>
-					m_registerCategories;
-		unsigned long		m_worker_threads;
-		const std::string       m_token;
+						m_registerCategories;
+		unsigned long			m_worker_threads;
+		const std::string       	m_token;
+		std::queue<ControlRequest *>	m_requests;
+		std::mutex			m_mutex;
+		std::condition_variable		m_cv;
+		bool				m_stopping;
 };
 #endif
