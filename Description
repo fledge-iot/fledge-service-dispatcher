@@ -1,0 +1,1 @@
+Dispatcher service is responsible for dispatching control messages between Fledge services.
