@@ -53,6 +53,22 @@ void KVList::add(const string& key, const string& value)
 }
 
 /**
+ * Return the value for a given key
+ *
+ * @param key	The key to lookup
+ * @return string	The value or an empty string if the key was not found
+ */
+const string KVList::getValue(const string& key) const
+{
+	for (auto &p : m_list)
+	{
+		if (key.compare(p.first) == 0)
+			return p.second;
+	}
+	return string("");
+}
+
+/**
  * Return the key/value pair list as a set of JSON properties
  *
  * @return string	The key/value pair list as JSON

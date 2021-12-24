@@ -27,6 +27,7 @@ class KVList {
 		~KVList() {};
 		void			add(const std::string& key,
 			      	 	    const std::string& value);
+		const std::string	getValue(const std::string& key) const;
 		std::string		toJSON();
 		size_t			size() { return m_list.size(); };
 

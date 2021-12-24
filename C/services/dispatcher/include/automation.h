@@ -18,9 +18,12 @@
 #include <chrono>
 #include <thread>
 #include <kvlist.h>
+#include <rapidjson/document.h>
 
 class DispatcherService;
 class ScriptStep;
+
+#define SCRIPT_TABLE	"control_script"
 
 /**
  * A class that represents the script that is executed
@@ -31,10 +34,13 @@ class Script {
 		{
 		};
 		~Script();
-		bool		execute(DispatchService *);
+		bool		execute(DispatcherService *, const KVList&);
 
 	private:
 		bool		addStep(int, ScriptStep *);
+		bool		load(DispatcherService *);
+		ScriptStep	*parseStep(const std::string& type, const rapidjson::Value& value);
+		bool		addCondition(ScriptStep *step, const rapidjson::Value& value);
 
 	private:
 		const std::string	m_name;
@@ -48,7 +54,21 @@ class Script {
  */
 class ScriptStep {
 	public:
-		virtual bool execute(DispatcherService *) = 0;
+		virtual bool execute(DispatcherService *, const KVList&) = 0;
+		void		addCondition(const std::string& key, const std::string& op,
+						const std::string& value)
+			        {
+					m_key = key;
+					m_op = op;
+					m_value = value;
+				}
+	protected:
+		bool			evaluate(const KVList& values);
+
+	private:
+		std::string		m_key;
+		std::string		m_op;
+		std::string		m_value;
 };
 
 /**
@@ -60,7 +80,7 @@ class WriteScriptStep : public ScriptStep {
 						m_service(service), m_values(values)
 				{
 				};
-		bool		execute(DispatcherService *);
+		bool		execute(DispatcherService *, const KVList&);
 	private:
 		const std::string	m_service;
 		const KVList		m_values;
@@ -71,13 +91,14 @@ class WriteScriptStep : public ScriptStep {
  */
 class OperationScriptStep : public ScriptStep {
 	public:
-		OperationScriptStep(const std::string& operation, const KVList& parameters) :
-					m_operation(operation), m_parameters(parameters)
+		OperationScriptStep(const std::string& operation, const std::string& service, const KVList& parameters) :
+					m_operation(operation), m_service(service), m_parameters(parameters)
 				{
 				};
-		bool		execute(DispatcherService *);
+		bool		execute(DispatcherService *, const KVList&);
 	private:
 		const std::string	m_operation;
+		const std::string	m_service;
 		const KVList		m_parameters;
 };
 
@@ -86,16 +107,19 @@ class OperationScriptStep : public ScriptStep {
  */
 class DelayScriptStep : public ScriptStep {
 	public:
-		WriteScriptStep(const unsigned int delay) : m_delay(delay)
+		DelayScriptStep(const unsigned int delay) : m_delay(delay)
 				{
 				};
-		bool		execute(DispatcherService *)
+		bool		execute(DispatcherService *service, const KVList& parameters)
 				{
-					std::this_thread::sleep_for(
+					if (evaluate(parameters))
+					{
+						std::this_thread::sleep_for(
 							std::chrono::milliseconds(m_delay));
+					}
 				}
 	private:
-		unsigned int		delay;
+		unsigned int		m_delay;
 };
 
 /**
@@ -109,7 +133,7 @@ class ConfigScriptStep : public ScriptStep {
 						m_name(name), m_value(value)
 				{
 				};
-		bool		execute(DispatcherService *);
+		bool		execute(DispatcherService *, const KVList&);
 	private:
 		const std::string&	m_category;
 		const std::string&	m_name;
@@ -125,7 +149,7 @@ class ScriptScriptStep : public ScriptStep {
 		ScriptScriptStep(const std::string& name) : m_name(name)
 				{
 				};
-		bool		execute(DispatcherService *);
+		bool		execute(DispatcherService *, const KVList&);
 	private:
 		const std::string	m_name;
 };
