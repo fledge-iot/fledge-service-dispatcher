@@ -448,6 +448,10 @@ bool ScriptScriptStep::execute(DispatcherService *service, const KVList& paramet
 	{
 		return true;
 	}
+
+	// TODO Execution of scripts on the background
+	Script script(m_name);
+	return script.execute(service, parameters);
 }
 
 /**
