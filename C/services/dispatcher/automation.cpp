@@ -15,6 +15,14 @@
 using namespace std;
 
 /**
+ * Destructor for the script. Cleanup any resources held
+ * by the script.
+ */
+Script::~Script()
+{
+}
+
+/**
  * Execute a script by iterating through the steps of the script 
  * calling the execute method of each step. As soon as the first step
  * fails then the entire script is aborted and fails.
@@ -23,6 +31,13 @@ using namespace std;
  */
 bool Script::execute(DispatcherService *service, const KVList& parameters)
 {
+	if (!m_loaded)
+	{
+		if (!load(service))
+		{
+			return false;
+		}
+	}
 	for (auto it = m_steps.begin(); it != m_steps.end(); ++it)
 	{
 		bool res = it->second->execute(service, parameters);
@@ -341,12 +356,13 @@ bool Script::addCondition(ScriptStep *step, const Value& value)
 	return true;	// Unconditional step
 }
 
+
 /**
  * Evalaute a script step condition to see if the step
  * should be executed.
  *
  * @param parameters	The parameters passed to the script
- * @return bool		True if the step shoudl be executed
+ * @return bool		True if the step should be executed
  */
 bool ScriptStep::evaluate(const KVList& parameters)
 {
@@ -381,6 +397,13 @@ bool WriteScriptStep::execute(DispatcherService *service, const KVList& paramete
 	{
 		return true;
 	}
+
+	m_values.substitute(m_values);
+
+	string payload = "{ \"values\" : { ";
+	payload += m_values.toJSON();
+	payload += "\" } }";
+	return service->sendToService(m_service, "/fledge/south/setpoint", payload);
 }
 
 /**
@@ -396,6 +419,20 @@ bool OperationScriptStep::execute(DispatcherService *service, const KVList& para
 	{
 		return true;
 	}
+
+
+	string payload = "{ \"operation\" : \"";
+	payload += m_operation;
+	payload += "\", ";
+	if (m_parameters.size() > 0)
+	{
+		m_parameters.substitute(parameters);
+		payload += "\"parameters\" : { ";
+		payload += m_parameters.toJSON();
+		payload += "} ";
+	}
+	payload += " }";
+	return service->sendToService(m_service, "/fledge/south/operation", payload);
 }
 
 /**
@@ -407,7 +444,7 @@ bool OperationScriptStep::execute(DispatcherService *service, const KVList& para
  */
 bool ScriptScriptStep::execute(DispatcherService *service, const KVList& parameters)
 {
-	if (!evaluate(parameters))	// The condition evalauted to false, skip the step
+	if (!evaluate(parameters))	// The condition evaluated to false, skip the step
 	{
 		return true;
 	}
@@ -426,5 +463,6 @@ bool ConfigScriptStep::execute(DispatcherService *service, const KVList& paramet
 	{
 		return true;
 	}
+	// TODO add the code to execute the configuration change
 }
 

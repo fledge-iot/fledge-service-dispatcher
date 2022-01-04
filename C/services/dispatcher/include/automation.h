@@ -50,7 +50,7 @@ class Script {
 };
 
 /**
- * Abstrratc scrpt step class
+ * Abstract script step class
  */
 class ScriptStep {
 	public:
@@ -83,7 +83,7 @@ class WriteScriptStep : public ScriptStep {
 		bool		execute(DispatcherService *, const KVList&);
 	private:
 		const std::string	m_service;
-		const KVList		m_values;
+		KVList			m_values;
 };
 
 /**
@@ -99,7 +99,7 @@ class OperationScriptStep : public ScriptStep {
 	private:
 		const std::string	m_operation;
 		const std::string	m_service;
-		const KVList		m_parameters;
+		KVList			m_parameters;
 };
 
 /**

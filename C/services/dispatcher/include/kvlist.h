@@ -30,8 +30,10 @@ class KVList {
 		const std::string	getValue(const std::string& key) const;
 		std::string		toJSON();
 		size_t			size() { return m_list.size(); };
+		void			substitute(const KVList& values);
 
 	private:
+		void			substitute(std::string& value, const KVList& values);
 		std::vector<std::pair<std::string, std::string> >
 					m_list;
 };

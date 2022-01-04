@@ -89,3 +89,49 @@ string KVList::toJSON()
 	payload += " }";
 	return payload;
 }
+
+/**
+ * Substitute values into the list.
+ *
+ * @param values	A key/value list of parameters to substitute
+ */
+void KVList::substitute(const KVList& values)
+{
+	for (auto& value : m_list)
+	{
+		substitute(value.second, values);
+	}
+}
+
+/**
+ * Substitute parameters within a string
+ *
+ * @param value	The string to perform substitution on
+ * @param values	The values to use for the substitution
+ */
+void KVList::substitute(string& value, const KVList& values)
+{
+	string rval;
+	size_t dstart, p1 = 0;
+	while ((dstart = value.find_first_of("$", p1)) != string::npos)
+	{
+		rval.append(value.substr(p1, dstart - p1));
+		dstart++;
+		size_t dend = value.find_first_of ("$", dstart);
+		if (dend != string::npos)
+		{
+			string var = value.substr(dstart, dend - dstart);
+			rval.append(values.getValue(var));
+		}
+		else
+		{
+			Logger::getLogger()->error("Unterminated macro substitution in '%s':%ld", value.c_str(), p1);
+		}
+		p1 = dend + 1;
+	}
+	rval.append(value.substr(p1));
+
+	Logger::getLogger()->debug("'%s'", value.c_str());
+	Logger::getLogger()->debug("became '%s'", rval.c_str());
+	value = rval;
+}

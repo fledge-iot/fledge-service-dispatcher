@@ -9,6 +9,7 @@
  */
 #include <controlrequest.h>
 #include <dispatcher_service.h>
+#include <automation.h>
 
 using namespace std;
 
@@ -43,7 +44,8 @@ void ControlWriteBroadcastRequest::execute(DispatcherService *service)
  */
 void ControlWriteScriptRequest::execute(DispatcherService *service)
 {
-	// TODO Implement script execution
+	Script script(m_scriptName);
+	script.execute(service, m_values);
 }
 
 
