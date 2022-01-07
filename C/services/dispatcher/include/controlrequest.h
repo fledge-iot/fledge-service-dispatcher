@@ -56,7 +56,7 @@ class ControlWriteServiceRequest : public WriteControlRequest {
 };
 
 /**
- * A request to write a value usign a specific script
+ * A request to write a value using a specific script
  */
 class ControlWriteScriptRequest : public WriteControlRequest {
 	public:
