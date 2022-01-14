@@ -11,6 +11,7 @@
 #include <dispatcher_service.h>
 #include <query.h>
 #include <rapidjson/document.h>
+#include <logger.h>
 
 using namespace std;
 
@@ -38,11 +39,15 @@ bool Script::execute(DispatcherService *service, const KVList& parameters)
 			return false;
 		}
 	}
+	Logger::getLogger()->debug("Execute script %s", m_name.c_str());
+	int stepNo = 0;
 	for (auto it = m_steps.begin(); it != m_steps.end(); ++it)
 	{
+		stepNo++;
 		bool res = it->second->execute(service, parameters);
 		if (!res)
 		{
+			Logger::getLogger()->info("Execute of %s failed at step %d", m_name.c_str(), stepNo);
 			return res;
 		}
 	}
@@ -157,7 +162,7 @@ bool Script::load(DispatcherService *service)
  * Add a step into the script
  *
  * @param stepNo  The step number
- * @param srep	  The step to add
+ * @param step	  The step to add
  * @return bool True if the step was added
  */
 bool Script::addStep(int stepNo, ScriptStep *step)
@@ -467,6 +472,6 @@ bool ConfigScriptStep::execute(DispatcherService *service, const KVList& paramet
 	{
 		return true;
 	}
-	// TODO add the code to execute the configuration change
+	service->getManagementClient()->setCategoryItemValue(m_category, m_name, m_value);
 }
 

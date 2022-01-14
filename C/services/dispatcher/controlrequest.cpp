@@ -10,6 +10,7 @@
 #include <controlrequest.h>
 #include <dispatcher_service.h>
 #include <automation.h>
+#include <plugin_api.h>
 
 using namespace std;
 
@@ -34,7 +35,17 @@ void ControlWriteServiceRequest::execute(DispatcherService *service)
  */
 void ControlWriteBroadcastRequest::execute(DispatcherService *service)
 {
-	// TODO Implement broadcast mechamism
+	vector<ServiceRecord *> services;
+	service->getManagementClient()->getServices(services, PLUGIN_TYPE_SOUTH);
+
+	string payload = "{ \"values\" : { ";
+	payload += m_values.toJSON();
+	payload += "\" } }";
+	
+	for (auto& record : services)
+	{
+		service->sendToService(record->getName(), "/fledge/south/setpoint", payload);
+	}
 }
 
 /**
@@ -76,5 +87,22 @@ void ControlOperationServiceRequest::execute(DispatcherService *service)
  */
 void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 {
-	// TODO Imolement broadcast mechanism
+	vector<ServiceRecord *> services;
+	service->getManagementClient()->getServices(services, PLUGIN_TYPE_SOUTH);
+
+	string payload = "{ \"operation\" : \"";
+	payload += m_operation;
+	payload += "\", ";
+	if (m_parameters.size() > 0)
+	{
+		payload += "\"parameters\" : { ";
+		payload += m_parameters.toJSON();
+		payload += "} ";
+	}
+	payload += " }";
+	
+	for (auto& record : services)
+	{
+		service->sendToService(record->getName(), "/fledge/south/operation", payload);
+	}
 }

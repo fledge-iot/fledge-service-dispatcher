@@ -24,9 +24,13 @@
 #define SERVICE_NAME		"Fledge Dispatcher"
 #define SERVICE_TYPE		"Dispatcher"
 #define DISPATCHER_CATEGORY	"Dispatcher"
-#define DEFAULT_WORKER_THREADS 2
+#define DEFAULT_WORKER_THREADS	2
+
 /**
  * The DispatcherService class.
+ *
+ * The main class responsible for managing requests, handlign the queues and interfacing
+ * to the other Fledge services.
  */
 class DispatcherService : public ServiceHandler
 {
