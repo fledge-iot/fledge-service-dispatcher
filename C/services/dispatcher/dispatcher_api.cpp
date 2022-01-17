@@ -159,6 +159,12 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 				respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
 				return;
 			}
+			else if (destination.compare("asset") == 0)
+			{
+				string responsePayload = QUOTE({ "message" : "Missing asset name in write payload" });
+				respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+				return;
+			}
 			if (doc.HasMember("write") && doc["write"].IsObject())
 			{
 				KVList values(doc["write"]);
@@ -167,6 +173,10 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 				{
 					writeRequest = new ControlWriteServiceRequest(name, values); 
 				}
+				else if (destination.compare("asset"))
+				{
+					writeRequest = new ControlWriteAssetRequest(name, values); 
+				}
 				else if (destination.compare("script"))
 				{
 					writeRequest = new ControlWriteScriptRequest(name, values); 
@@ -174,6 +184,11 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 				else if (destination.compare("broadcast"))
 				{
 					writeRequest = new ControlWriteBroadcastRequest(values); 
+				}
+				else
+				{
+					string responsePayload = QUOTE({ "message" : "Unsupported destination for write request" });
+					respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
 				}
 				if (writeRequest)
 				{
@@ -201,10 +216,88 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 				      shared_ptr<HttpServer::Request> request)
 {
-	string payload("{ \"error\" : \"Unsupported URL: " + request->path + "\" }");
-	respond(response,
-		SimpleWeb::StatusCode::client_error_bad_request,
-		payload);
+	string destination, name, key, value;
+	string payload = request->content.string();
+	try {
+		Document doc;
+		ParseResult result = doc.Parse(payload.c_str());
+		if (result)
+		{
+			if (doc.HasMember("destination") && doc["destination"].IsString())
+			{
+				destination = doc["destination"].GetString();
+			}
+			else
+			{
+				string responsePayload = QUOTE({ "message" : "Missing 'destination' in operation payload" });
+				respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+				return;
+			}
+			if (doc.HasMember("name") && doc["name"].IsString())
+			{
+				name = doc["name"].GetString();
+			}
+			else if (destination.compare("script") == 0)
+			{
+				string responsePayload = QUOTE({ "message" : "Missing script name in operation payload" });
+				respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+				return;
+			}
+			else if (destination.compare("service") == 0)
+			{
+				string responsePayload = QUOTE({ "message" : "Missing service name in operation payload" });
+				respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+				return;
+			}
+			else if (destination.compare("asset") == 0)
+			{
+				string responsePayload = QUOTE({ "message" : "Missing asset name in operation payload" });
+				respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+				return;
+			}
+			if (doc.HasMember("operation") && doc["operation"].IsObject())
+			{
+				for (auto& op : doc["operation"].GetObject())
+				{
+					string operation = op.name.GetString();
+					KVList values(op.value);
+					ControlRequest *opRequest = NULL;
+					if (destination.compare("service"))
+					{
+						opRequest = new ControlOperationServiceRequest(operation, name, values); 
+					}
+					else if (destination.compare("asset"))
+					{
+						opRequest = new ControlOperationAssetRequest(operation, name, values); 
+					}
+					else if (destination.compare("broadcast"))
+					{
+						opRequest = new ControlOperationBroadcastRequest(operation, values); 
+					}
+					else
+					{
+						string responsePayload = QUOTE({ "message" : "Unsupported destination for operation request" });
+						respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+					}
+					if (opRequest)
+					{
+						queueRequest(opRequest);
+					}
+				}
+			}
+		}
+		else
+		{
+			string responsePayload = QUOTE({ "message" : "Failed to parse request payload" });
+			respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+		}
+		
+	} catch (exception &e) {
+		char buffer[80];
+		snprintf(buffer, sizeof(buffer), "\"Exception: %s\"", e.what());
+		string responsePayload = QUOTE({ "message" : buffer });
+		respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+	}
 }
 
 /**

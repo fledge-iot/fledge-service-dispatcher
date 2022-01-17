@@ -16,6 +16,7 @@
 #include <logger.h>
 #include <iostream>
 #include <string>
+#include <asset_tracking.h>
 
 #include <storage_client.h>
 #include <config_handler.h>
@@ -125,6 +126,9 @@ bool DispatcherService::start(string& coreAddress,
 		this->cleanupResources();
 		return false;
 	}
+
+	// Make sure we have an instance of the asset tracker
+	AssetTracker *tracker = new AssetTracker(m_managementClient, m_name);
 
 	// Create a category with Dispatcher name
 	DefaultConfigCategory dispatcherServerConfig(DISPATCHER_CATEGORY, string("{}"));

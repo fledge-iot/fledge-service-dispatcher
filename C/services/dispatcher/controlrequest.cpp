@@ -11,6 +11,7 @@
 #include <dispatcher_service.h>
 #include <automation.h>
 #include <plugin_api.h>
+#include <asset_tracking.h>
 
 using namespace std;
 
@@ -61,6 +62,27 @@ void ControlWriteScriptRequest::execute(DispatcherService *service)
 
 
 /**
+ * Implementation of the write to the service that ingests a specific asset 
+ * from the dispatcher service.
+ *
+ * @param service	The dispatcher service that provides the methods required
+ */
+void ControlWriteAssetRequest::execute(DispatcherService *service)
+{
+	AssetTracker *tracker = AssetTracker::getAssetTracker();
+	try {
+		string ingestService = tracker->getIngestService(m_asset);
+		string payload = "{ \"values\" : { ";
+		payload += m_values.toJSON();
+		payload += "\" } }";
+		service->sendToService(ingestService, "/fledge/south/setpoint", payload);
+	} catch (...) {
+		Logger::getLogger()->error("Unable to fetch service that ingests asset %s",
+				m_asset.c_str());
+	}
+}
+
+/**
  * Implementation of the execution of an operation on a specified south service
  *
  * @param service	The dispatcher service that provides the methods required
@@ -78,6 +100,34 @@ void ControlOperationServiceRequest::execute(DispatcherService *service)
 	}
 	payload += " }";
 	service->sendToService(m_service, "/fledge/south/operation", payload);
+}
+
+/**
+ * Implementation of the execution of an operation on a south service responible
+ * for the ingest of a given asset
+ *
+ * @param service	The dispatcher service that provides the methods required
+ */
+void ControlOperationAssetRequest::execute(DispatcherService *service)
+{
+	AssetTracker *tracker = AssetTracker::getAssetTracker();
+	try {
+		string ingestService = tracker->getIngestService(m_asset);
+		string payload = "{ \"operation\" : \"";
+		payload += m_operation;
+		payload += "\", ";
+		if (m_parameters.size() > 0)
+		{
+			payload += "\"parameters\" : { ";
+			payload += m_parameters.toJSON();
+			payload += "} ";
+		}
+		payload += " }";
+		service->sendToService(ingestService, "/fledge/south/operation", payload);
+	} catch (...) {
+		Logger::getLogger()->error("Unable to fetch service that ingests asset %s",
+				m_asset.c_str());
+	}
 }
 
 /**
