@@ -23,9 +23,10 @@ using namespace std;
  */
 void ControlWriteServiceRequest::execute(DispatcherService *service)
 {
-	string payload = "{ \"values\" : { ";
+	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
-	payload += "\" } }";
+	payload += " }";
+	Logger::getLogger()->fatal("Send payload to service '%s'", payload.c_str());
 	service->sendToService(m_service, "/fledge/south/setpoint", payload);
 }
 
@@ -37,15 +38,19 @@ void ControlWriteServiceRequest::execute(DispatcherService *service)
 void ControlWriteBroadcastRequest::execute(DispatcherService *service)
 {
 	vector<ServiceRecord *> services;
-	service->getManagementClient()->getServices(services, PLUGIN_TYPE_SOUTH);
+	service->getManagementClient()->getServices(services, "Southbound");
 
-	string payload = "{ \"values\" : { ";
+	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
-	payload += "\" } }";
+	payload += " }";
 	
 	for (auto& record : services)
 	{
-		service->sendToService(record->getName(), "/fledge/south/setpoint", payload);
+		try {
+			service->sendToService(record->getName(), "/fledge/south/setpoint", payload);
+		} catch (...) {
+			Logger::getLogger()->info("Service '%s' does not support write operation", record->getName().c_str());
+		}
 	}
 }
 
@@ -72,9 +77,9 @@ void ControlWriteAssetRequest::execute(DispatcherService *service)
 	AssetTracker *tracker = AssetTracker::getAssetTracker();
 	try {
 		string ingestService = tracker->getIngestService(m_asset);
-		string payload = "{ \"values\" : { ";
+		string payload = "{ \"values\" : ";
 		payload += m_values.toJSON();
-		payload += "\" } }";
+		payload += " }";
 		service->sendToService(ingestService, "/fledge/south/setpoint", payload);
 	} catch (...) {
 		Logger::getLogger()->error("Unable to fetch service that ingests asset %s",
@@ -94,9 +99,8 @@ void ControlOperationServiceRequest::execute(DispatcherService *service)
 	payload += "\", ";
 	if (m_parameters.size() > 0)
 	{
-		payload += "\"parameters\" : { ";
+		payload += "\"parameters\" : ";
 		payload += m_parameters.toJSON();
-		payload += "} ";
 	}
 	payload += " }";
 	service->sendToService(m_service, "/fledge/south/operation", payload);
@@ -118,9 +122,8 @@ void ControlOperationAssetRequest::execute(DispatcherService *service)
 		payload += "\", ";
 		if (m_parameters.size() > 0)
 		{
-			payload += "\"parameters\" : { ";
+			payload += "\"parameters\" : ";
 			payload += m_parameters.toJSON();
-			payload += "} ";
 		}
 		payload += " }";
 		service->sendToService(ingestService, "/fledge/south/operation", payload);
@@ -145,9 +148,8 @@ void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 	payload += "\", ";
 	if (m_parameters.size() > 0)
 	{
-		payload += "\"parameters\" : { ";
+		payload += "\"parameters\" : ";
 		payload += m_parameters.toJSON();
-		payload += "} ";
 	}
 	payload += " }";
 	

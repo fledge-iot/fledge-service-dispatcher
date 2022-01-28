@@ -50,7 +50,8 @@ DispatcherApi::DispatcherApi(const unsigned short port,
 DispatcherApi::~DispatcherApi()
 {
 	delete m_server;
-	delete m_thread;
+	if (m_thread)
+		delete m_thread;
 }
 
 /**
@@ -169,19 +170,19 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 			{
 				KVList values(doc["write"]);
 				ControlRequest *writeRequest = NULL;
-				if (destination.compare("service"))
+				if (destination.compare("service") == 0)
 				{
 					writeRequest = new ControlWriteServiceRequest(name, values); 
 				}
-				else if (destination.compare("asset"))
+				else if (destination.compare("asset") == 0)
 				{
 					writeRequest = new ControlWriteAssetRequest(name, values); 
 				}
-				else if (destination.compare("script"))
+				else if (destination.compare("script") == 0)
 				{
 					writeRequest = new ControlWriteScriptRequest(name, values); 
 				}
-				else if (destination.compare("broadcast"))
+				else if (destination.compare("broadcast") == 0)
 				{
 					writeRequest = new ControlWriteBroadcastRequest(values); 
 				}
@@ -208,6 +209,8 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 		string responsePayload = QUOTE({ "message" : buffer });
 		respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
 	}
+	string responsePayload = QUOTE({ "message" : "Request queued" });
+	respond(response, SimpleWeb::StatusCode::success_accepted,responsePayload);
 }
 
 /**
@@ -262,15 +265,15 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 					string operation = op.name.GetString();
 					KVList values(op.value);
 					ControlRequest *opRequest = NULL;
-					if (destination.compare("service"))
+					if (destination.compare("service") == 0)
 					{
 						opRequest = new ControlOperationServiceRequest(operation, name, values); 
 					}
-					else if (destination.compare("asset"))
+					else if (destination.compare("asset") == 0)
 					{
 						opRequest = new ControlOperationAssetRequest(operation, name, values); 
 					}
-					else if (destination.compare("broadcast"))
+					else if (destination.compare("broadcast") == 0)
 					{
 						opRequest = new ControlOperationBroadcastRequest(operation, values); 
 					}
@@ -298,6 +301,8 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 		string responsePayload = QUOTE({ "message" : buffer });
 		respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
 	}
+	string responsePayload = QUOTE({ "message" : "Request queued" });
+	respond(response, SimpleWeb::StatusCode::success_accepted,responsePayload);
 }
 
 /**
