@@ -405,9 +405,9 @@ bool WriteScriptStep::execute(DispatcherService *service, const KVList& paramete
 
 	m_values.substitute(m_values);
 
-	string payload = "{ \"values\" : { ";
+	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
-	payload += "\" } }";
+	payload += " }";
 	return service->sendToService(m_service, "/fledge/south/setpoint", payload);
 }
 
@@ -432,9 +432,8 @@ bool OperationScriptStep::execute(DispatcherService *service, const KVList& para
 	if (m_parameters.size() > 0)
 	{
 		m_parameters.substitute(parameters);
-		payload += "\"parameters\" : { ";
+		payload += "\"parameters\" : ";
 		payload += m_parameters.toJSON();
-		payload += "} ";
 	}
 	payload += " }";
 	return service->sendToService(m_service, "/fledge/south/operation", payload);
