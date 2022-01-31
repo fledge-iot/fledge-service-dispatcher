@@ -16,6 +16,7 @@
 #include <logger.h>
 #include <iostream>
 #include <string>
+#include <asset_tracking.h>
 
 #include <storage_client.h>
 #include <config_handler.h>
@@ -69,9 +70,21 @@ DispatcherService::DispatcherService(const string& myName, const string& token) 
  */
 DispatcherService::~DispatcherService()
 {
-	delete m_api;
-	delete m_managementClient;
-	delete m_managementApi;
+	if (m_api)
+	{
+		delete m_api;
+		m_api = NULL;
+	}
+	if (m_managementClient)
+	{
+		delete m_managementClient;
+		m_managementClient = NULL;
+	}
+	if (m_managementApi)
+	{
+		delete m_managementApi;
+		m_managementApi = NULL;
+	}
 	delete m_logger;
 }
 
@@ -126,6 +139,9 @@ bool DispatcherService::start(string& coreAddress,
 		return false;
 	}
 
+	// Make sure we have an instance of the asset tracker
+	AssetTracker *tracker = new AssetTracker(m_managementClient, m_name);
+
 	// Create a category with Dispatcher name
 	DefaultConfigCategory dispatcherServerConfig(DISPATCHER_CATEGORY, string("{}"));
 	dispatcherServerConfig.setDescription("Dispatcher server " + string(DISPATCHER_CATEGORY));
@@ -154,6 +170,7 @@ bool DispatcherService::start(string& coreAddress,
 					 "integer", "2", "2");
 	defConfigAdvanced.setItemDisplayName("dispatcherThreads",
 						    "Maximun number of dispatcher threads");
+	defConfigAdvanced.setDescription("Dispatcher Service Advanced");
 
 	// Create/Update category name (we pass keep_original_items=true)
 	if (m_managementClient->addCategory(defConfigAdvanced, true))
@@ -248,6 +265,10 @@ bool DispatcherService::start(string& coreAddress,
 	// - Dispatcher API listener is already down.
 	// - all xyz already unregistered
 
+	m_managementClient->addAuditEntry("DSPSD",
+					"INFORMATION",
+					"{\"name\": \"" + m_name + "\"}");
+
 	// Unregister from storage service
 	m_managementClient->unregisterService();
 
@@ -255,12 +276,7 @@ bool DispatcherService::start(string& coreAddress,
 	m_managementApi->stop();
 
 	// Flush all data in the queues
-
 	m_logger->info("Dispatcher service '" + m_name + "' shutdown completed.");
-
-	m_managementClient->addAuditEntry("DSPSD",
-					"INFORMATION",
-					"{\"name\": \"" + m_name + "\"}");
 
 	return true;
 }
@@ -272,6 +288,7 @@ bool DispatcherService::start(string& coreAddress,
 void DispatcherService::stop()
 {
 	m_stopping = true;
+	m_cv.notify_all();
 	// Stop the DispatcherApi
 	m_api->stop();
 }

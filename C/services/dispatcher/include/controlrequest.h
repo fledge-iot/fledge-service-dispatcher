@@ -56,6 +56,21 @@ class ControlWriteServiceRequest : public WriteControlRequest {
 };
 
 /**
+ * A request to write a control message to the service that ingests a specific asset
+ */
+class ControlWriteAssetRequest : public WriteControlRequest {
+	public:
+		ControlWriteAssetRequest(const std::string& asset, KVList& values) :
+		       			m_asset(asset),
+					WriteControlRequest(values)
+		{
+		};
+		void		execute(DispatcherService *);
+	private:
+		std::string	m_asset;
+};
+
+/**
  * A request to write a value using a specific script
  */
 class ControlWriteScriptRequest : public WriteControlRequest {
@@ -112,6 +127,23 @@ class ControlOperationServiceRequest : public ControlOperationRequest {
 
 	protected:
 		const std::string	m_service;
+};
+
+/**
+ * A request to execute an operation on a service responsible for the ingest o a given asset
+ */
+class ControlOperationAssetRequest : public ControlOperationRequest {
+	public:
+		ControlOperationAssetRequest(const std::string& operation, 
+				const std::string& asset, KVList& parameters):
+					m_asset(asset),
+					ControlOperationRequest(operation, parameters)
+		{
+		};
+		void execute(DispatcherService *);
+
+	protected:
+		const std::string	m_asset;
 };
 
 /**

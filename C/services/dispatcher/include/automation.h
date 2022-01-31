@@ -26,7 +26,9 @@ class ScriptStep;
 #define SCRIPT_TABLE	"control_script"
 
 /**
- * A class that represents the script that is executed
+ * A class that represents the script that is executed. The class
+ * is responsible for loading the script steps form the database 
+ * and the execution of the script itself.
  */
 class Script {
 	public:

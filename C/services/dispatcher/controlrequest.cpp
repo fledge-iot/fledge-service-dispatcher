@@ -10,6 +10,8 @@
 #include <controlrequest.h>
 #include <dispatcher_service.h>
 #include <automation.h>
+#include <plugin_api.h>
+#include <asset_tracking.h>
 
 using namespace std;
 
@@ -21,9 +23,10 @@ using namespace std;
  */
 void ControlWriteServiceRequest::execute(DispatcherService *service)
 {
-	string payload = "{ \"values\" : { ";
+	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
-	payload += "\" } }";
+	payload += " }";
+	Logger::getLogger()->fatal("Send payload to service '%s'", payload.c_str());
 	service->sendToService(m_service, "/fledge/south/setpoint", payload);
 }
 
@@ -34,7 +37,21 @@ void ControlWriteServiceRequest::execute(DispatcherService *service)
  */
 void ControlWriteBroadcastRequest::execute(DispatcherService *service)
 {
-	// TODO Implement broadcast mechamism
+	vector<ServiceRecord *> services;
+	service->getManagementClient()->getServices(services, "Southbound");
+
+	string payload = "{ \"values\" : ";
+	payload += m_values.toJSON();
+	payload += " }";
+	
+	for (auto& record : services)
+	{
+		try {
+			service->sendToService(record->getName(), "/fledge/south/setpoint", payload);
+		} catch (...) {
+			Logger::getLogger()->info("Service '%s' does not support write operation", record->getName().c_str());
+		}
+	}
 }
 
 /**
@@ -50,6 +67,27 @@ void ControlWriteScriptRequest::execute(DispatcherService *service)
 
 
 /**
+ * Implementation of the write to the service that ingests a specific asset 
+ * from the dispatcher service.
+ *
+ * @param service	The dispatcher service that provides the methods required
+ */
+void ControlWriteAssetRequest::execute(DispatcherService *service)
+{
+	AssetTracker *tracker = AssetTracker::getAssetTracker();
+	try {
+		string ingestService = tracker->getIngestService(m_asset);
+		string payload = "{ \"values\" : ";
+		payload += m_values.toJSON();
+		payload += " }";
+		service->sendToService(ingestService, "/fledge/south/setpoint", payload);
+	} catch (...) {
+		Logger::getLogger()->error("Unable to fetch service that ingests asset %s",
+				m_asset.c_str());
+	}
+}
+
+/**
  * Implementation of the execution of an operation on a specified south service
  *
  * @param service	The dispatcher service that provides the methods required
@@ -61,12 +99,38 @@ void ControlOperationServiceRequest::execute(DispatcherService *service)
 	payload += "\", ";
 	if (m_parameters.size() > 0)
 	{
-		payload += "\"parameters\" : { ";
+		payload += "\"parameters\" : ";
 		payload += m_parameters.toJSON();
-		payload += "} ";
 	}
 	payload += " }";
 	service->sendToService(m_service, "/fledge/south/operation", payload);
+}
+
+/**
+ * Implementation of the execution of an operation on a south service responible
+ * for the ingest of a given asset
+ *
+ * @param service	The dispatcher service that provides the methods required
+ */
+void ControlOperationAssetRequest::execute(DispatcherService *service)
+{
+	AssetTracker *tracker = AssetTracker::getAssetTracker();
+	try {
+		string ingestService = tracker->getIngestService(m_asset);
+		string payload = "{ \"operation\" : \"";
+		payload += m_operation;
+		payload += "\", ";
+		if (m_parameters.size() > 0)
+		{
+			payload += "\"parameters\" : ";
+			payload += m_parameters.toJSON();
+		}
+		payload += " }";
+		service->sendToService(ingestService, "/fledge/south/operation", payload);
+	} catch (...) {
+		Logger::getLogger()->error("Unable to fetch service that ingests asset %s",
+				m_asset.c_str());
+	}
 }
 
 /**
@@ -76,5 +140,21 @@ void ControlOperationServiceRequest::execute(DispatcherService *service)
  */
 void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 {
-	// TODO Imolement broadcast mechanism
+	vector<ServiceRecord *> services;
+	service->getManagementClient()->getServices(services, PLUGIN_TYPE_SOUTH);
+
+	string payload = "{ \"operation\" : \"";
+	payload += m_operation;
+	payload += "\", ";
+	if (m_parameters.size() > 0)
+	{
+		payload += "\"parameters\" : ";
+		payload += m_parameters.toJSON();
+	}
+	payload += " }";
+	
+	for (auto& record : services)
+	{
+		service->sendToService(record->getName(), "/fledge/south/operation", payload);
+	}
 }
