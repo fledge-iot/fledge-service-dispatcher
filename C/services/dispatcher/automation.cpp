@@ -11,6 +11,7 @@
 #include <dispatcher_service.h>
 #include <query.h>
 #include <rapidjson/document.h>
+#include <rapidjson/error/en.h>
 #include <logger.h>
 
 using namespace std;
@@ -44,11 +45,19 @@ bool Script::execute(DispatcherService *service, const KVList& parameters)
 	for (auto it = m_steps.begin(); it != m_steps.end(); ++it)
 	{
 		stepNo++;
-		bool res = it->second->execute(service, parameters);
-		if (!res)
+		if (it->second)
 		{
-			Logger::getLogger()->info("Execute of %s failed at step %d", m_name.c_str(), stepNo);
-			return res;
+			bool res = it->second->execute(service, parameters);
+			if (!res)
+			{
+				Logger::getLogger()->info("Execute of %s failed at step %d", m_name.c_str(), stepNo);
+				return res;
+			}
+		}
+		else
+		{
+			Logger::getLogger()->error("Script %s hsa an invalid step %d", m_name.c_str(), stepNo);
+			return false;
 		}
 	}
 	return true;
@@ -65,8 +74,8 @@ bool Script::load(DispatcherService *service)
 	Logger *log = Logger::getLogger();
 	StorageClient *storage = service->getStorageClient();
 
-	Where where("name", Equals, m_name);
-	Query scriptQuery(&where);
+	Where *where = new Where("name", Equals, m_name);
+	Query scriptQuery(where);
 	ResultSet *result = storage->queryTable(SCRIPT_TABLE, scriptQuery);
 	if (!result || result->rowCount() != 1)
 	{
@@ -78,77 +87,90 @@ bool Script::load(DispatcherService *service)
 	}
 	ResultSet::RowIterator row = result->firstRow();
 	ResultSet::ColumnValue *scriptCol = (*row)->getColumn("steps");
-	const Value *json = scriptCol->getJSON();
-	if (json->HasMember("steps"))
+	char *str = scriptCol->getString();
+	// Substitute singke quote with double quote to allow parsing
+	char *p = str;
+	while (*p)
 	{
-		const Value& steps = (*json)["steps"];
-		if (steps.IsArray())
+		if (*p == '\'')
+			*p = '\"';
+		p++;
+	}
+	Document doc;
+	ParseResult ok = doc.Parse(str);
+	if (!ok)
+	{
+		log->error("Parse error in script %s: %s (%u)", m_name.c_str(),
+					GetParseError_En(ok.Code()), ok.Offset());
+		log->error("Script %s is: %s", m_name.c_str(), str);
+		delete result;
+		return false;
+	}
+	if (doc.IsArray())
+	{
+		for (auto& item : doc.GetArray())
 		{
-			for (auto& item : steps.GetArray())
+			if (item.IsObject())
 			{
-				if (item.IsObject())
+				for (auto& itemValue : item.GetObject())
 				{
-					for (auto& itemValue : item.GetObject())
+					string type = itemValue.name.GetString();
+					const Value& step = itemValue.value;
+					if (step.IsObject())
 					{
-						string type = itemValue.name.GetString();
-						const Value& step = itemValue.value;
-						if (step.IsObject())
+						int order = 0;
+						if (step.HasMember("order") && step["order"].IsInt64())
 						{
-							int order = 0;
-							if (step.HasMember("order") && step["order"].IsInt64())
+							order = step["order"].GetInt64();
+						}
+						else
+						{
+							log->error("Control script '%s' is badly formatted, %s step is missing an order item",
+								m_name.c_str(), type.c_str());
+							delete result;
+							return false;
+						}
+						ScriptStep *s = parseStep(type, step);
+						if (s != NULL)
+						{
+							if (!addStep(order, s))
 							{
-								order = step["order"].GetInt64();
-							}
-							else
-							{
-								log->error("Control script '%s' is badly formatted, %s step is missing an order item",
-									m_name.c_str(), type.c_str());
-								delete result;
-								return false;
-							}
-							ScriptStep *s = parseStep(type, step);
-							if (s != NULL)
-							{
-								addStep(order, s);
-							}
-							else
-							{
-								log->error("Control script '%s' is badly formatted, %s script step failed to parse",
-									m_name.c_str(), type.c_str());
+								log->error("Control script '%s' has more than one step with order of %d", m_name.c_str(), order);
 								delete result;
 								return false;
 							}
 						}
 						else
 						{
-							log->error("Control script '%s' is badly formatted, %s step is not an object",
+							log->error("Control script '%s' is badly formatted, %s script step failed to parse",
 								m_name.c_str(), type.c_str());
 							delete result;
 							return false;
 						}
 					}
-				}
-				else
-				{
-					log->error("Control script '%s' is badly formatted, step items should be objects",
-							m_name.c_str());
-					delete result;
-					return false;
-
+					else
+					{
+						log->error("Control script '%s' is badly formatted, %s step is not an object",
+							m_name.c_str(), type.c_str());
+						delete result;
+						return false;
+					}
 				}
 			}
-		}
-		else
-		{
-			log->error("Control script '%s' is badly formatted, steps should be an array",
-					m_name.c_str());
-			delete result;
-			return false;
+			else
+			{
+				log->error("Control script '%s' is badly formatted, step items should be objects",
+						m_name.c_str());
+				delete result;
+				return false;
+
+			}
 		}
 	}
 	else
 	{
-		log->error("Control script '%s' is missing steps", m_name.c_str());
+		log->error("Control script '%s' is badly formatted, steps should be an array",
+				m_name.c_str());
 		delete result;
 		return false;
 	}
@@ -169,7 +191,10 @@ bool Script::addStep(int stepNo, ScriptStep *step)
 {
 	try {
 		ScriptStep *current = m_steps[stepNo];
-		return false;
+		if (current)
+			return false;
+		else
+			m_steps[stepNo] = step;
 	} catch (...) {
 		m_steps.insert(pair<int, ScriptStep *>(stepNo, step));
 	}
@@ -256,9 +281,9 @@ ScriptStep *Script::parseStep(const string& type, const Value& step)
 	else if (type.compare("delay") == 0)
 	{
 		unsigned int delay;
-		if (step.HasMember("delay") && step["delay"].IsInt64())
+		if (step.HasMember("duration") && step["duration"].IsInt64())
 		{
-			delay = step["delay"].GetInt64();
+			delay = step["duration"].GetInt64();
 		}
 		else
 		{
