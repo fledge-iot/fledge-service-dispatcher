@@ -119,6 +119,7 @@ class DelayScriptStep : public ScriptStep {
 						std::this_thread::sleep_for(
 							std::chrono::milliseconds(m_delay));
 					}
+					return true;
 				}
 	private:
 		unsigned int		m_delay;
