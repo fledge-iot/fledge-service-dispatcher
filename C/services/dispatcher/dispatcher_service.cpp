@@ -434,6 +434,12 @@ bool DispatcherService::sendToService(const string& serviceName, const string& u
 
 		try {
 			SimpleWeb::CaseInsensitiveMultimap headers = {{"Content-Type", "application/json"}};
+			// Pass Dispatcher bearer token in service operation 
+			string regToken = m_managementClient->getRegistrationBearerToken();
+			if (regToken != "")
+			{
+				headers.emplace("Authorization", "Bearer " + regToken);
+			}
 			auto res = http.request("PUT", url, payload, headers);
 			if (res->status_code.compare("200 OK"))
 			{
