@@ -42,11 +42,11 @@ static void worker_thread(void *data)
  * @param    myName	The Dispatcher server name
  */
 DispatcherService::DispatcherService(const string& myName, const string& token) :
+					 m_name(myName),
 					 m_shutdown(false),
 					 m_token(token),
 					 m_stopping(false)
 {
-	m_name = myName;
 	// Default to a dynamic port
 	unsigned short servicePort = 0;
 
@@ -61,7 +61,7 @@ DispatcherService::DispatcherService(const string& myName, const string& token) 
 	m_api = new DispatcherApi(servicePort, threads);
 
 	// Set NULL for other resources
-	m_mgtClient = NULL;
+	m_managementClient = NULL;
 	m_managementApi = NULL;
 }
 
@@ -75,10 +75,10 @@ DispatcherService::~DispatcherService()
 		delete m_api;
 		m_api = NULL;
 	}
-	if (m_mgtClient)
+	if (m_managementClient)
 	{
-		delete m_mgtClient;
-		m_mgtClient = NULL;
+		delete m_managementClient;
+		m_managementClient = NULL;
 	}
 	if (m_managementApi)
 	{
@@ -128,8 +128,8 @@ bool DispatcherService::start(string& coreAddress,
 	}
 
 	// Get management client
-	m_mgtClient = new ManagementClient(coreAddress, corePort);
-	if (!m_mgtClient)
+	m_managementClient = new ManagementClient(coreAddress, corePort);
+	if (!m_managementClient)
 	{
 		m_logger->fatal("Dispacther service '" + m_name + \
 				"' can not connect to Fledge at " + \
@@ -140,12 +140,12 @@ bool DispatcherService::start(string& coreAddress,
 	}
 
 	// Make sure we have an instance of the asset tracker
-	AssetTracker *tracker = new AssetTracker(m_mgtClient, m_name);
+	AssetTracker *tracker = new AssetTracker(m_managementClient, m_name);
 
 	// Create a category with Dispatcher name
-	DefaultConfigCategory dispatcherServerConfig(m_name, string("{}"));
-	dispatcherServerConfig.setDescription("Dispatcher server " + string(m_name));
-	if (!m_mgtClient->addCategory(dispatcherServerConfig, true))
+	DefaultConfigCategory dispatcherServerConfig(DISPATCHER_CATEGORY, string("{}"));
+	dispatcherServerConfig.setDescription("Dispatcher server " + string(DISPATCHER_CATEGORY));
+	if (!m_managementClient->addCategory(dispatcherServerConfig, true))
 	{
 		m_logger->fatal("Dispatcher service '" + m_name + \
 				"' can not connect to Fledge ConfigurationManager at " + \
@@ -156,10 +156,10 @@ bool DispatcherService::start(string& coreAddress,
 	}
 
 	// Deal with registering and fetching the advanced configuration
-	string advancedCatName = m_name + string("Advanced");
+	string advancedCatName = DISPATCHER_CATEGORY+string("Advanced");
 	DefaultConfigCategory defConfigAdvanced(advancedCatName, string("{}"));
 	//addConfigDefaults(defConfigAdvanced);
-	defConfigAdvanced.setDescription(m_name + string(" advanced config params"));
+	defConfigAdvanced.setDescription(DISPATCHER_CATEGORY+string(" advanced config params"));
 	vector<string>  logLevels = { "error", "warning", "info", "debug" };
 	defConfigAdvanced.addItem("logLevel", "Minimum logging level reported",
                         "warning", "warning", logLevels);
@@ -173,11 +173,11 @@ bool DispatcherService::start(string& coreAddress,
 	defConfigAdvanced.setDescription("Dispatcher Service Advanced");
 
 	// Create/Update category name (we pass keep_original_items=true)
-	if (m_mgtClient->addCategory(defConfigAdvanced, true))
+	if (m_managementClient->addCategory(defConfigAdvanced, true))
 	{
 		vector<string> children1;
 		children1.push_back(advancedCatName);
-		m_mgtClient->addChildCategories(m_name, children1);
+		m_managementClient->addChildCategories(DISPATCHER_CATEGORY, children1);
 	}
 
 	// Register this dispatcher service with Fledge core
@@ -191,7 +191,7 @@ bool DispatcherService::start(string& coreAddress,
 			     managementListener,	// Management port
 			     m_token);			// Token
 
-	if (!m_mgtClient->registerService(record))
+	if (!m_managementClient->registerService(record))
 	{
 		m_logger->fatal("Unable to register service "
 				"\"Dispatcher\" for service '" + m_name + "'");
@@ -200,11 +200,11 @@ bool DispatcherService::start(string& coreAddress,
 		return false;
 	}
 
-	// Register m_name category to Fledge Core
-	registerCategory(m_name);
+	// Register DISPATCHER_CATEGORY to Fledge Core
+	registerCategory(DISPATCHER_CATEGORY);
 	registerCategory(advancedCatName);
 
-	ConfigCategory category = m_mgtClient->getCategory(advancedCatName);
+	ConfigCategory category = m_managementClient->getCategory(advancedCatName);
 	if (category.itemExists("logLevel"))
 	{
 		m_logger->setMinLevel(category.getValue("logLevel"));
@@ -225,7 +225,7 @@ bool DispatcherService::start(string& coreAddress,
 
 	// Get Storage service
 	ServiceRecord storageInfo("", "Storage");
-	if (!m_mgtClient->getService(storageInfo))
+	if (!m_managementClient->getService(storageInfo))
 	{
 		m_logger->fatal("Unable to find Fledge storage "
 				"connection info for service '" + m_name + "'");
@@ -233,7 +233,7 @@ bool DispatcherService::start(string& coreAddress,
 		this->cleanupResources();
 
 		// Unregister from Fledge
-		m_mgtClient->unregisterService();
+		m_managementClient->unregisterService();
 
 		return false;
 	}
@@ -246,12 +246,9 @@ bool DispatcherService::start(string& coreAddress,
 				    storageInfo.getPort());
 	m_storage = &storageClient;
 
-	m_mgtClient->addAuditEntry("DSPST",
+	m_managementClient->addAuditEntry("DSPST",
 					"INFORMATION",
 					"{\"name\": \"" + m_name + "\"}");
-
-	// Create default security category
-	this->createSecurityCategories(m_mgtClient);
 
 	// Start the worker threads
 	for (int i = 0; i < m_worker_threads; i++)
@@ -268,12 +265,12 @@ bool DispatcherService::start(string& coreAddress,
 	// - Dispatcher API listener is already down.
 	// - all xyz already unregistered
 
-	m_mgtClient->addAuditEntry("DSPSD",
+	m_managementClient->addAuditEntry("DSPSD",
 					"INFORMATION",
 					"{\"name\": \"" + m_name + "\"}");
 
 	// Unregister from storage service
-	m_mgtClient->unregisterService();
+	m_managementClient->unregisterService();
 
 	// Stop management API
 	m_managementApi->stop();
@@ -327,13 +324,13 @@ void DispatcherService::cleanupResources()
 void DispatcherService::configChange(const string& categoryName,
 				       const string& category)
 {
-	if (categoryName.compare(m_name) == 0)
+	if (categoryName.compare(DISPATCHER_CATEGORY) == 0)
 	{
 			m_logger->warn("Configuration change for '%s' category not implemented yet",
-					m_name.c_str());
+					DISPATCHER_CATEGORY);
 	}
 
-	if (categoryName.compare(m_name + "Advanced") == 0)
+	if (categoryName.compare(string(DISPATCHER_CATEGORY)+"Advanced") == 0)
 	{
 		ConfigCategory config(categoryName, category);
 		if (config.itemExists("logLevel"))
@@ -352,7 +349,7 @@ void DispatcherService::configChange(const string& categoryName,
  */
 void DispatcherService::registerCategory(const string& categoryName)
 {
-	ConfigHandler* configHandler = ConfigHandler::getInstance(m_mgtClient);
+	ConfigHandler* configHandler = ConfigHandler::getInstance(m_managementClient);
 	// Call registerCategory only once
 	if (configHandler &&
 	    m_registerCategories.find(categoryName) == m_registerCategories.end())
@@ -424,7 +421,7 @@ bool DispatcherService::sendToService(const string& serviceName, const string& u
 {
 	try {
 		ServiceRecord service(serviceName);
-		if (!m_mgtClient->getService(service))
+		if (!m_managementClient->getService(service))
 		{
 			Logger::getLogger()->error("Unable to find service '%s'", serviceName.c_str());
 			return false;
@@ -437,12 +434,6 @@ bool DispatcherService::sendToService(const string& serviceName, const string& u
 
 		try {
 			SimpleWeb::CaseInsensitiveMultimap headers = {{"Content-Type", "application/json"}};
-			// Pass Dispatcher bearer token in service operation 
-			string regToken = m_mgtClient->getRegistrationBearerToken();
-			if (regToken != "")
-			{
-				headers.emplace("Authorization", "Bearer " + regToken);
-			}
 			auto res = http.request("PUT", url, payload, headers);
 			if (res->status_code.compare("200 OK"))
 			{

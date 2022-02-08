@@ -496,6 +496,6 @@ bool ConfigScriptStep::execute(DispatcherService *service, const KVList& paramet
 	{
 		return true;
 	}
-	service->getMgmtClient()->setCategoryItemValue(m_category, m_name, m_value);
+	service->getManagementClient()->setCategoryItemValue(m_category, m_name, m_value);
 }
 

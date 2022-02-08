@@ -366,17 +366,8 @@ void DispatcherApi::initResources()
 	m_server->default_resource["GET"] = defaultWrapper;
 	m_server->default_resource["POST"] = defaultWrapper;
 	m_server->default_resource["DELETE"] = defaultWrapper;
-
-	// AuthenticationMiddleware for POST regexp paths: use lambda funcion, passing the class object
-
-	m_server->resource[DISPATCH_WRITE]["POST"] = [this](shared_ptr<HttpServer::Response> response,
-					shared_ptr<HttpServer::Request> request) {
-					m_service->AuthenticationMiddlewarePOST(response, request, writeWrapper);
-	};
-	m_server->resource[DISPATCH_OPERATION]["POST"] = [this](shared_ptr<HttpServer::Response> response,
-					shared_ptr<HttpServer::Request> request) {
-					m_service->AuthenticationMiddlewarePOST(response, request, operationWrapper);
-	};
+	m_server->resource[DISPATCH_WRITE]["POST"] = writeWrapper;
+	m_server->resource[DISPATCH_OPERATION]["POST"] = operationWrapper;
 }
 
 /**
