@@ -23,16 +23,15 @@
 
 #define SERVICE_NAME		"Fledge Dispatcher"
 #define SERVICE_TYPE		"Dispatcher"
-#define DISPATCHER_CATEGORY	"Dispatcher"
 #define DEFAULT_WORKER_THREADS	2
 
 /**
  * The DispatcherService class.
  *
- * The main class responsible for managing requests, handlign the queues and interfacing
+ * The main class responsible for managing requests, handling the queues and interfacing
  * to the other Fledge services.
  */
-class DispatcherService : public ServiceHandler
+class DispatcherService : public ServiceAuthHandler
 {
 	public:
 		DispatcherService(const std::string& name, const std::string& token = "");
@@ -45,7 +44,6 @@ class DispatcherService : public ServiceHandler
 		void			configChange(const std::string&,
 						     const std::string&);
 		void			registerCategory(const std::string& categoryName);
-		ManagementClient*	getManagementClient() { return m_managementClient; };
 		StorageClient*		getStorageClient() { return m_storage; };
 		bool			queue(ControlRequest *request);
 		void			worker();
@@ -56,11 +54,9 @@ class DispatcherService : public ServiceHandler
 		ControlRequest		*getRequest();
 
 	private:
-		const std::string		m_name;
 		Logger*				m_logger;
 		bool				m_shutdown;
 		DispatcherApi*			m_api;
-		ManagementClient* 		m_managementClient;
 		ManagementApi*			m_managementApi;
 		StorageClient*			m_storage;
 		std::map<std::string, bool>

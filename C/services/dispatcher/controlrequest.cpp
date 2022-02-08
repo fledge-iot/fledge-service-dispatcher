@@ -38,7 +38,7 @@ void ControlWriteServiceRequest::execute(DispatcherService *service)
 void ControlWriteBroadcastRequest::execute(DispatcherService *service)
 {
 	vector<ServiceRecord *> services;
-	service->getManagementClient()->getServices(services, "Southbound");
+	service->getMgmtClient()->getServices(services, "Southbound");
 
 	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
@@ -141,7 +141,7 @@ void ControlOperationAssetRequest::execute(DispatcherService *service)
 void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 {
 	vector<ServiceRecord *> services;
-	service->getManagementClient()->getServices(services, PLUGIN_TYPE_SOUTH);
+	service->getMgmtClient()->getServices(services, PLUGIN_TYPE_SOUTH);
 
 	string payload = "{ \"operation\" : \"";
 	payload += m_operation;
