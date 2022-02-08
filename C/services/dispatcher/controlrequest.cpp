@@ -26,7 +26,7 @@ void ControlWriteServiceRequest::execute(DispatcherService *service)
 	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
 	payload += " }";
-	Logger::getLogger()->fatal("Send payload to service '%s'", payload.c_str());
+	Logger::getLogger()->debug("Send payload to service '%s'", payload.c_str());
 	service->sendToService(m_service, "/fledge/south/setpoint", payload);
 }
 
