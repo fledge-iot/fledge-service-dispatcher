@@ -5,7 +5,7 @@
  *
  * Released under the Apache 2.0 Licence
  *
- * Author: Mark Riddoch
+ * Author: Mark Riddoch, Massimiliano Pinto
  */
 #include <automation.h>
 #include <dispatcher_service.h>
@@ -87,28 +87,60 @@ bool Script::load(DispatcherService *service)
 	}
 	ResultSet::RowIterator row = result->firstRow();
 	ResultSet::ColumnValue *scriptCol = (*row)->getColumn("steps");
-	char *str = scriptCol->getString();
-	// Substitute singke quote with double quote to allow parsing
-	char *p = str;
-	while (*p)
+
+	// Data in "steps" might be string or JSON
+	const rapidjson::Value *doc;
+	rapidjson::Value stringV;
+
+	// Check for string
+	if (scriptCol->getType() == ColumnType::STRING_COLUMN)
 	{
-		if (*p == '\'')
-			*p = '\"';
-		p++;
-	}
-	Document doc;
-	ParseResult ok = doc.Parse(str);
-	if (!ok)
-	{
-		log->error("Parse error in script %s: %s (%u)", m_name.c_str(),
+		char *str;
+		str = scriptCol->getString();
+		// Substitute singke quote with double quote to allow parsing
+		char *p = str;
+		while (*p)
+		{
+			if (*p == '\'')
+				*p = '\"';
+			p++;
+		}
+
+		Document jsonDoc;
+		ParseResult ok = jsonDoc.Parse(str);
+		if (!ok)
+		{
+			log->error("Parse error in script %s: %s (%u)",
+					m_name.c_str(),
 					GetParseError_En(ok.Code()), ok.Offset());
-		log->error("Script %s is: %s", m_name.c_str(), str);
+			log->error("Script %s is: %s", m_name.c_str(), str);
+			delete result;
+			return false;
+		}
+
+		if (jsonDoc.IsArray())
+		{
+			stringV = jsonDoc.GetArray();
+			doc = &stringV;
+		}
+	}
+	// Check for JSON
+	else if (scriptCol->getType() == ColumnType::JSON_COLUMN)
+	{
+		doc = scriptCol->getJSON();
+	}
+	// Unsupported data type
+	else
+	{
+		log->error("Control script '%s' 'steps' should be string or JSON data",
+				m_name.c_str());
 		delete result;
 		return false;
 	}
-	if (doc.IsArray())
+
+	if (doc->IsArray())
 	{
-		for (auto& item : doc.GetArray())
+		for (auto& item : doc->GetArray())
 		{
 			if (item.IsObject())
 			{
@@ -169,7 +201,7 @@ bool Script::load(DispatcherService *service)
 	}
 	else
 	{
-		log->error("Control script '%s' is badly formatted, steps should be an array",
+		log->error("Control script '%s' is badly formatted, 'steps' should be an array",
 				m_name.c_str());
 		delete result;
 		return false;
