@@ -40,6 +40,7 @@ class DispatcherService : public ServiceAuthHandler
 					      unsigned short corePort);
 		void 			stop();
 		void			shutdown();
+		bool			isRunning() { return !m_stopping; };
 		void			cleanupResources();
 		void			configChange(const std::string&,
 						     const std::string&);
