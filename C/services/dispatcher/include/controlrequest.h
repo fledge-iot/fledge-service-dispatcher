@@ -25,6 +25,19 @@ class DispatcherService;
 class ControlRequest {
 	public:
 		virtual void execute(DispatcherService *) = 0;
+
+		void 	setSourceName(std::string& source_name)
+		{
+			m_source_name = source_name;
+		};
+		void 	setSourceType(std::string& source_type)
+		{
+			m_source_type = source_type;
+		};
+
+	public:
+		std::string	m_source_name;
+		std::string	m_source_type;
 };
 
 /**
@@ -106,7 +119,7 @@ class ControlOperationRequest : public ControlRequest {
 			m_operation(operation), m_parameters(parameters)
 		{
 		};
-		virtual void execute(DispatcherService *) = 0;
+		virtual void	execute(DispatcherService *) = 0;
 	protected:
 		const std::string		m_operation;
 		KVList				m_parameters;

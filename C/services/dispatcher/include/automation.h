@@ -7,7 +7,7 @@
  *
  * Released under the Apache 2.0 Licence
  *
- * Author: Mark Riddoch
+ * Author: Mark Riddoch, Massimiliano Pinto
  *
  * A set of classes that implement the automation scripts
  * that can be used by the control dispatcher
@@ -24,6 +24,7 @@ class DispatcherService;
 class ScriptStep;
 
 #define SCRIPT_TABLE	"control_script"
+#define ACL_TABLE	"control_acl"
 
 /**
  * A class that represents the script that is executed. The class
@@ -49,6 +50,19 @@ class Script {
 		bool			m_loaded;
 		std::map<int, ScriptStep *>
 					m_steps;
+	public:
+		void	setSourceName(std::string& source_name)
+		{
+			m_source_name = source_name;
+		};
+		void	setSourceType(std::string& source_type)
+		{
+			m_source_type = source_type;
+		};
+
+        private:
+                std::string     m_source_name;
+                std::string     m_source_type;
 };
 
 /**
@@ -71,6 +85,20 @@ class ScriptStep {
 		std::string		m_key;
 		std::string		m_op;
 		std::string		m_value;
+
+	public:
+		void	setSourceName(std::string& source_name)
+		{
+			m_source_name = source_name;
+		};
+		void	setSourceType(std::string& source_type)
+		{
+			m_source_type = source_type;
+		};
+
+  	public:
+                std::string     m_source_name;
+                std::string     m_source_type;
 };
 
 /**
