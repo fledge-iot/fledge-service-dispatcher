@@ -127,6 +127,34 @@ void DispatcherApi::wait() {
 void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 				      shared_ptr<HttpServer::Request> request)
 {
+	// Get authentication enabled value
+	bool auth_set = m_service->getAuthenticatedCaller();
+
+	Logger::getLogger()->debug("Service '%s' has AuthenticatedCaller flag set %d",
+				m_service->getName().c_str(),
+				auth_set);
+
+	// Store bearer token claims 'sub', 'aud', 'iss'
+	map<string, string> claims;
+
+	// If authentication is set verify input token and service/URL ACLs
+	if (auth_set)
+	{
+		// Verify access token from caller and check caller can access dispatcher
+		// Routine sends HTTP reply in case of errors
+		// Get token claims:
+		// 'sub' is called service name
+		// 'aud' is caller service type
+		// 'iss' is caller organisation (not in use here)
+		claims = m_service->AuthenticationMiddlewareCommon(response, request);
+
+		// Check we have 'sub', 'aud', 'iss'
+		if (claims.size() < 3)
+		{
+			return;
+		}
+	}
+
 	string destination, name, key, value;
 	string payload = request->content.string();
 	try {
@@ -193,6 +221,15 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 				}
 				if (writeRequest)
 				{
+					// If authentication is set then add service name/type
+					if (auth_set)
+					{
+						// Add source name and type
+						writeRequest->setSourceName(claims["sub"]);
+						writeRequest->setSourceType(claims["aud"]);
+					}
+
+					// Add request to the queue
 					queueRequest(writeRequest);
 				}
 			}
@@ -221,6 +258,35 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 {
 	string destination, name, key, value;
 	string payload = request->content.string();
+
+	// Get authentication enabled value
+	bool auth_set = m_service->getAuthenticatedCaller();
+
+	Logger::getLogger()->debug("Service '%s' has AuthenticatedCaller flag set %d",
+				m_service->getName().c_str(),
+				auth_set);
+
+	// Store bearer token claims 'sub', 'aud', 'iss'
+	map<string, string> claims;
+
+	// If authentication is set verify input token and service/URL ACLs
+	if (auth_set)
+	{
+		// Verify access token from caller and check caller can access dispatcher
+		// Routine sends HTTP reply in case of errors
+		// Get token claims:
+		// 'sub' is called service name
+		// 'aud' is caller service type
+		// 'iss' is caller organisation (not in use here)
+		claims = m_service->AuthenticationMiddlewareCommon(response, request);
+
+		// Check we have 'sub', 'aud', 'iss'
+		if (claims.size() < 3)
+		{
+			return;
+		}
+	}
+
 	try {
 		Document doc;
 		ParseResult result = doc.Parse(payload.c_str());
@@ -284,6 +350,14 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 					}
 					if (opRequest)
 					{
+						// If authentication is set then add service name/type
+						if (auth_set)
+						{
+							// Add source name and type
+							opRequest->setSourceName(claims["sub"]);
+							opRequest->setSourceType(claims["aud"]);
+						}
+
 						queueRequest(opRequest);
 					}
 				}
@@ -367,16 +441,10 @@ void DispatcherApi::initResources()
 	m_server->default_resource["POST"] = defaultWrapper;
 	m_server->default_resource["DELETE"] = defaultWrapper;
 
-	// AuthenticationMiddleware for POST regexp paths: use lambda funcion, passing the class object
-
-	m_server->resource[DISPATCH_WRITE]["POST"] = [this](shared_ptr<HttpServer::Response> response,
-					shared_ptr<HttpServer::Request> request) {
-					m_service->AuthenticationMiddlewarePOST(response, request, writeWrapper);
-	};
-	m_server->resource[DISPATCH_OPERATION]["POST"] = [this](shared_ptr<HttpServer::Response> response,
-					shared_ptr<HttpServer::Request> request) {
-					m_service->AuthenticationMiddlewarePOST(response, request, operationWrapper);
-	};
+	// writeWrapper and operationWrapper
+	// call AuthenticationMiddlewareCommon
+	m_server->resource[DISPATCH_WRITE]["POST"] = writeWrapper;
+	m_server->resource[DISPATCH_OPERATION]["POST"] = operationWrapper;
 }
 
 /**
@@ -443,3 +511,4 @@ bool DispatcherApi::queueRequest(ControlRequest *request)
 {
 	return m_service->queue(request);
 }
+
