@@ -427,7 +427,11 @@ ControlRequest *request;
  * @param payload	The JSON payload to send
  * @return bool		True if the payload was delivered to the service
  */
-bool DispatcherService::sendToService(const string& serviceName, const string& url, const string& payload)
+bool DispatcherService::sendToService(const string& serviceName,
+				const string& url,
+				const string& payload,
+				const string& sourceName,
+				const string& sourceType)
 {
 	try {
 		ServiceRecord service(serviceName);
@@ -450,6 +454,8 @@ bool DispatcherService::sendToService(const string& serviceName, const string& u
 			{
 				headers.emplace("Authorization", "Bearer " + regToken);
 			}
+			headers.emplace("Service-Orig-From", sourceName);
+			headers.emplace("Service-Orig-Type", sourceType);
 			auto res = http.request("PUT", url, payload, headers);
 			if (res->status_code.compare("200 OK"))
 			{

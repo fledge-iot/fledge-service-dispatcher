@@ -48,8 +48,12 @@ class DispatcherService : public ServiceAuthHandler
 		StorageClient*		getStorageClient() { return m_storage; };
 		bool			queue(ControlRequest *request);
 		void			worker();
+		void			token_checker();
 		bool			sendToService(const std::string& service, 
-						const std::string& url, const std::string& payload);
+						const std::string& url,
+						const std::string& payload,
+						const std::string& sourceName,
+						const std::string& sourceType);
 
 	private:
 		ControlRequest		*getRequest();
