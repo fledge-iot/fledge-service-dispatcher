@@ -75,9 +75,10 @@ void ControlWriteScriptRequest::execute(DispatcherService *service)
 {
 	Script script(m_scriptName);
 
-	// Set m_source_name and m_source_name in the Script object
+	// Set m_source_name, m_source_name and m_request_url in the Script object
 	script.setSourceName(m_source_name);
 	script.setSourceType(m_source_type);
+	script.setRequestURL(m_request_url);
 
 	script.execute(service, m_values);
 }

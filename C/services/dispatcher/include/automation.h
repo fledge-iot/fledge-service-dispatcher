@@ -19,6 +19,7 @@
 #include <thread>
 #include <kvlist.h>
 #include <rapidjson/document.h>
+#include <dispatcher_service.h>
 
 class DispatcherService;
 class ScriptStep;
@@ -38,6 +39,7 @@ class Script {
 		};
 		~Script();
 		bool		execute(DispatcherService *, const KVList&);
+		bool		validateACL(DispatcherService *, ResultSet::ColumnValue *);
 
 	private:
 		bool		addStep(int, ScriptStep *);
@@ -59,10 +61,15 @@ class Script {
 		{
 			m_source_type = source_type;
 		};
+		void    setRequestURL(std::string& url)
+		{
+			m_request_url = url;
+		};
 
-        private:
-                std::string     m_source_name;
-                std::string     m_source_type;
+	private:
+		std::string	m_source_name;
+		std::string	m_source_type;
+		std::string	m_request_url;
 };
 
 /**
@@ -95,10 +102,15 @@ class ScriptStep {
 		{
 			m_source_type = source_type;
 		};
+		void    setRequestURL(std::string& url)
+		{
+			m_request_url = url;
+		};
 
-  	public:
-                std::string     m_source_name;
-                std::string     m_source_type;
+	protected:
+		std::string	m_source_name;
+		std::string	m_source_type;
+		std::string	m_request_url;
 };
 
 /**

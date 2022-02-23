@@ -7,7 +7,7 @@
  *
  * Released under the Apache 2.0 Licence
  *
- * Author: Mark Riddoch
+ * Author: Mark Riddoch, Massimiliano Pinto
  *
  * A set of classes thatg implement the storage and execution for
  * the various control requests that can be processed by the control
@@ -34,10 +34,15 @@ class ControlRequest {
 		{
 			m_source_type = source_type;
 		};
+		void    setRequestURL(std::string& url)
+                {
+                        m_request_url = url;
+                };
 
 	public:
 		std::string	m_source_name;
 		std::string	m_source_type;
+		std::string	m_request_url;
 };
 
 /**
