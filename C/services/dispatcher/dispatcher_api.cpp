@@ -134,22 +134,17 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 				m_service->getName().c_str(),
 				auth_set);
 
-	// Store bearer token claims 'sub', 'aud', 'iss'
-	map<string, string> claims;
+	string callerName, callerType;
 
 	// If authentication is set verify input token and service/URL ACLs
 	if (auth_set)
 	{
 		// Verify access token from caller and check caller can access dispatcher
 		// Routine sends HTTP reply in case of errors
-		// Get token claims:
-		// 'sub' is called service name
-		// 'aud' is caller service type
-		// 'iss' is caller organisation (not in use here)
-		claims = m_service->AuthenticationMiddlewareCommon(response, request);
-
-		// Check we have 'sub', 'aud', 'iss'
-		if (claims.size() < 3)
+		if (!m_service->AuthenticationMiddlewareCommon(response,
+					request,
+					callerName,
+					callerType))
 		{
 			return;
 		}
@@ -224,9 +219,9 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 					// If authentication is set then add service name/type
 					if (auth_set)
 					{
-						// Add source name and type
-						writeRequest->setSourceName(claims["sub"]);
-						writeRequest->setSourceType(claims["aud"]);
+						// Add caller name and type
+						writeRequest->setSourceName(callerName);
+						writeRequest->setSourceType(callerType);
 					}
 
 					// Add request to the queue
@@ -266,22 +261,17 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 				m_service->getName().c_str(),
 				auth_set);
 
-	// Store bearer token claims 'sub', 'aud', 'iss'
-	map<string, string> claims;
+	string callerName, callerType;
 
 	// If authentication is set verify input token and service/URL ACLs
 	if (auth_set)
 	{
 		// Verify access token from caller and check caller can access dispatcher
 		// Routine sends HTTP reply in case of errors
-		// Get token claims:
-		// 'sub' is called service name
-		// 'aud' is caller service type
-		// 'iss' is caller organisation (not in use here)
-		claims = m_service->AuthenticationMiddlewareCommon(response, request);
-
-		// Check we have 'sub', 'aud', 'iss'
-		if (claims.size() < 3)
+		if (!m_service->AuthenticationMiddlewareCommon(response,
+								request,
+								callerName,
+								callerType))
 		{
 			return;
 		}
@@ -353,9 +343,9 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 						// If authentication is set then add service name/type
 						if (auth_set)
 						{
-							// Add source name and type
-							opRequest->setSourceName(claims["sub"]);
-							opRequest->setSourceType(claims["aud"]);
+							// Add caller name and type
+							opRequest->setSourceName(callerName);
+							opRequest->setSourceType(callerType);
 						}
 
 						queueRequest(opRequest);
