@@ -460,7 +460,7 @@ bool WriteScriptStep::execute(DispatcherService *service, const KVList& paramete
 		return true;
 	}
 
-	m_values.substitute(m_values);
+	m_values.substitute(parameters);
 
 	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
