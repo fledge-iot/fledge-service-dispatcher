@@ -143,7 +143,7 @@ bool DispatcherService::start(string& coreAddress,
 	AssetTracker *tracker = new AssetTracker(m_managementClient, m_name);
 
 	// Create a category with Dispatcher name
-	DefaultConfigCategory dispatcherServerConfig(DISPATCHER_CATEGORY, string("{}"));
+	DefaultConfigCategory dispatcherServerConfig(m_name, string("{}"));
 	if (!m_managementClient->addCategory(dispatcherServerConfig, true))
 	{
 		m_logger->fatal("Dispatcher service '" + m_name + \
@@ -155,9 +155,9 @@ bool DispatcherService::start(string& coreAddress,
 	}
 
 
-	string serverCatName = DISPATCHER_CATEGORY+string("Server");
+	string serverCatName = m_name+string(" Server");
 	DefaultConfigCategory defConfigServer(serverCatName, string("{}"));
-	defConfigServer.setDescription("Dispatcher server " + string(DISPATCHER_CATEGORY));
+	defConfigServer.setDescription("Dispatcher server " + m_name);
 	defConfigServer.addItem("enable",
 					 "Enable or disable control functions",
 					 "boolean", "true", "1");
@@ -168,14 +168,14 @@ bool DispatcherService::start(string& coreAddress,
 	{
 		vector<string> children1;
 		children1.push_back(serverCatName);
-		m_managementClient->addChildCategories(DISPATCHER_CATEGORY, children1);
+		m_managementClient->addChildCategories(m_name, children1);
 	}
 
 	// Deal with registering and fetching the advanced configuration
-	string advancedCatName = DISPATCHER_CATEGORY+string("Advanced");
+	string advancedCatName = m_name+string(" Advanced");
 	DefaultConfigCategory defConfigAdvanced(advancedCatName, string("{}"));
 	//addConfigDefaults(defConfigAdvanced);
-	defConfigAdvanced.setDescription(DISPATCHER_CATEGORY+string(" advanced config params"));
+	defConfigAdvanced.setDescription(m_name+string(" advanced config params"));
 	vector<string>  logLevels = { "error", "warning", "info", "debug" };
 	defConfigAdvanced.addItem("logLevel", "Minimum logging level reported",
                         "warning", "warning", logLevels);
@@ -193,7 +193,7 @@ bool DispatcherService::start(string& coreAddress,
 	{
 		vector<string> children1;
 		children1.push_back(advancedCatName);
-		m_managementClient->addChildCategories(DISPATCHER_CATEGORY, children1);
+		m_managementClient->addChildCategories(m_name, children1);
 	}
 
 	// Register this dispatcher service with Fledge core
@@ -216,11 +216,11 @@ bool DispatcherService::start(string& coreAddress,
 		return false;
 	}
 
-	// Register DISPATCHER_CATEGORY to Fledge Core
-	registerCategory(DISPATCHER_CATEGORY);
+	// Register m_name to Fledge Core
+	registerCategory(m_name);
 	registerCategory(advancedCatName);
 
-	ConfigCategory serverCategory = m_managementClient->getCategory(DISPATCHER_CATEGORY);
+	ConfigCategory serverCategory = m_managementClient->getCategory(m_name);
 	if (serverCategory.itemExists("enable"))
 	{
 		string e = serverCategory.getValue("enable");
@@ -350,13 +350,13 @@ void DispatcherService::cleanupResources()
 void DispatcherService::configChange(const string& categoryName,
 				       const string& category)
 {
-	if (categoryName.compare(DISPATCHER_CATEGORY) == 0)
+	if (categoryName.compare(m_name) == 0)
 	{
 			m_logger->warn("Configuration change for '%s' category not implemented yet",
-					DISPATCHER_CATEGORY);
+					m_name);
 	}
 
-	if (categoryName.compare(string(DISPATCHER_CATEGORY)+"Server") == 0)
+	if (categoryName.compare(m_name + " Server") == 0)
 	{
 		ConfigCategory config(categoryName, category);
 		if (config.itemExists("enable"))
@@ -369,7 +369,7 @@ void DispatcherService::configChange(const string& categoryName,
 		}
 	}
 
-	if (categoryName.compare(string(DISPATCHER_CATEGORY)+"Advanced") == 0)
+	if (categoryName.compare(m_name + " Advanced") == 0)
 	{
 		ConfigCategory config(categoryName, category);
 		if (config.itemExists("logLevel"))

@@ -23,7 +23,6 @@
 
 #define SERVICE_NAME		"Fledge Dispatcher"
 #define SERVICE_TYPE		"Dispatcher"
-#define DISPATCHER_CATEGORY	"Dispatcher"
 #define DEFAULT_WORKER_THREADS	2
 
 /**
