@@ -23,7 +23,6 @@
 
 #define SERVICE_NAME		"Fledge Dispatcher"
 #define SERVICE_TYPE		"Dispatcher"
-#define DISPATCHER_CATEGORY	"Dispatcher"
 #define DEFAULT_WORKER_THREADS	2
 
 /**
@@ -72,5 +71,6 @@ class DispatcherService : public ServiceHandler
 		std::mutex			m_mutex;
 		std::condition_variable		m_cv;
 		bool				m_stopping;
+		bool				m_enable;
 };
 #endif
