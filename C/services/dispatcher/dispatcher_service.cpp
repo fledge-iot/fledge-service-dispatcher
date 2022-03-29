@@ -168,7 +168,7 @@ bool DispatcherService::start(string& coreAddress,
 	{
 		vector<string> children1;
 		children1.push_back(serverCatName);
-		m_managementClient->addChildCategories(m_name, children1);
+		m_mgtClient->addChildCategories(m_name, children1);
 	}
 
 	// Deal with registering and fetching the advanced configuration
