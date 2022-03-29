@@ -155,6 +155,22 @@ bool DispatcherService::start(string& coreAddress,
 		return false;
 	}
 
+	string serverCatName = m_name+string(" Server");
+	DefaultConfigCategory defConfigServer(serverCatName, string("{}"));
+	defConfigServer.setDescription("Dispatcher server " + m_name);
+	defConfigServer.addItem("enable",
+					 "Enable or disable control functions",
+					 "boolean", "true", "1");
+	defConfigServer.setItemDisplayName("enable",
+						    "Enable control");
+	// Create/Update category name (we pass keep_original_items=true)
+	if (m_mgtClient->addCategory(defConfigServer, true))
+	{
+		vector<string> children1;
+		children1.push_back(serverCatName);
+		m_managementClient->addChildCategories(m_name, children1);
+	}
+
 	// Deal with registering and fetching the advanced configuration
 	string advancedCatName = m_name + string("Advanced");
 	DefaultConfigCategory defConfigAdvanced(advancedCatName, string("{}"));
@@ -203,6 +219,16 @@ bool DispatcherService::start(string& coreAddress,
 	// Register m_name category to Fledge Core
 	registerCategory(m_name);
 	registerCategory(advancedCatName);
+
+	ConfigCategory serverCategory = m_mgtClient->getCategory(m_name);
+	if (serverCategory.itemExists("enable"))
+	{
+		string e = serverCategory.getValue("enable");
+		if (e.compare("true") == 0 || e.compare("TRUE") == 0)
+			m_enable = true;
+		else
+			m_enable = false;
+	}
 
 	ConfigCategory category = m_mgtClient->getCategory(advancedCatName);
 	if (category.itemExists("logLevel"))
@@ -333,6 +359,19 @@ void DispatcherService::configChange(const string& categoryName,
 					m_name.c_str());
 	}
 
+	if (categoryName.compare(m_name + " Server") == 0)
+	{
+		ConfigCategory config(categoryName, category);
+		if (config.itemExists("enable"))
+		{
+			string e = config.getValue("enable");
+			if (e.compare("true") == 0 || e.compare("TRUE") == 0)
+				m_enable = true;
+			else
+				m_enable = false;
+		}
+	}
+
 	if (categoryName.compare(m_name + "Advanced") == 0)
 	{
 		ConfigCategory config(categoryName, category);
@@ -433,6 +472,11 @@ bool DispatcherService::sendToService(const string& serviceName,
 				const string& sourceName,
 				const string& sourceType)
 {
+	if (!m_enable)
+	{
+		Logger::getLogger()->warn("Control functions are currently disable, control request to service %s is not being sent", serviceName.c_str());
+		return false;
+	}
 	try {
 		ServiceRecord service(serviceName);
 		if (!m_mgtClient->getService(service))

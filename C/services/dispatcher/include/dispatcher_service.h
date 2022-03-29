@@ -71,5 +71,6 @@ class DispatcherService : public ServiceAuthHandler
 		std::mutex			m_mutex;
 		std::condition_variable		m_cv;
 		bool				m_stopping;
+		bool				m_enable;
 };
 #endif
