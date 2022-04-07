@@ -219,15 +219,23 @@ bool DispatcherService::start(string& coreAddress,
 	// Register m_name category to Fledge Core
 	registerCategory(m_name);
 	registerCategory(advancedCatName);
+	registerCategory(serverCatName);
 
-	ConfigCategory serverCategory = m_mgtClient->getCategory(m_name);
+	ConfigCategory serverCategory = m_mgtClient->getCategory(serverCatName);
 	if (serverCategory.itemExists("enable"))
 	{
 		string e = serverCategory.getValue("enable");
 		if (e.compare("true") == 0 || e.compare("TRUE") == 0)
 			m_enable = true;
 		else
+		{
+			m_logger->warn("Control functions are currently disabled");
 			m_enable = false;
+		}
+	}
+	else
+	{
+		m_enable = true;
 	}
 
 	ConfigCategory category = m_mgtClient->getCategory(advancedCatName);
@@ -366,9 +374,21 @@ void DispatcherService::configChange(const string& categoryName,
 		{
 			string e = config.getValue("enable");
 			if (e.compare("true") == 0 || e.compare("TRUE") == 0)
+			{
+				if (!m_enable)
+				{
+					m_logger->warn("Control functions have been enabled");
+				}
 				m_enable = true;
+			}
 			else
+			{
+				if (m_enable)
+				{
+					m_logger->warn("Control functions have been disabled");
+				}
 				m_enable = false;
+			}
 		}
 	}
 
@@ -474,7 +494,7 @@ bool DispatcherService::sendToService(const string& serviceName,
 {
 	if (!m_enable)
 	{
-		Logger::getLogger()->warn("Control functions are currently disable, control request to service %s is not being sent", serviceName.c_str());
+		m_logger->warn("Control functions are currently disabled, control request to service %s is not being sent", serviceName.c_str());
 		return false;
 	}
 	try {
