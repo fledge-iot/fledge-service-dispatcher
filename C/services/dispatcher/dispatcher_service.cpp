@@ -221,7 +221,7 @@ bool DispatcherService::start(string& coreAddress,
 	registerCategory(advancedCatName);
 	registerCategory(serverCatName);
 
-	ConfigCategory serverCategory = m_managementClient->getCategory(m_name + " Server");
+	ConfigCategory serverCategory = m_managementClient->getCategory(serverCatName);
 	if (serverCategory.itemExists("enable"))
 	{
 		string e = serverCategory.getValue("enable");
