@@ -53,6 +53,11 @@ class DispatcherService : public ServiceAuthHandler
 						const std::string& payload,
 						const std::string& sourceName,
 						const std::string& sourceType);
+		void			configChildCreate(const std::string& parent_category,
+							const std::string&,
+							const std::string&) {};
+		void			configChildDelete(const std::string& parent_category,
+							const std::string&) {};
 
 	private:
 		ControlRequest		*getRequest();
