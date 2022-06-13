@@ -7,7 +7,7 @@
  *
  * Released under the Apache 2.0 Licence
  *
- * Author: Mark Riddoch
+ * Author: Mark Riddoch, Massimiliano Pinto
  *
  * A set of classes thatg implement the storage and execution for
  * the various control requests that can be processed by the control
@@ -25,6 +25,24 @@ class DispatcherService;
 class ControlRequest {
 	public:
 		virtual void execute(DispatcherService *) = 0;
+
+		void 	setSourceName(std::string& source_name)
+		{
+			m_source_name = source_name;
+		};
+		void 	setSourceType(std::string& source_type)
+		{
+			m_source_type = source_type;
+		};
+		void    setRequestURL(std::string& url)
+                {
+                        m_request_url = url;
+                };
+
+	public:
+		std::string	m_source_name;
+		std::string	m_source_type;
+		std::string	m_request_url;
 };
 
 /**
@@ -106,7 +124,7 @@ class ControlOperationRequest : public ControlRequest {
 			m_operation(operation), m_parameters(parameters)
 		{
 		};
-		virtual void execute(DispatcherService *) = 0;
+		virtual void	execute(DispatcherService *) = 0;
 	protected:
 		const std::string		m_operation;
 		KVList				m_parameters;

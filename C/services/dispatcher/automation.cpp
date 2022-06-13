@@ -40,7 +40,11 @@ bool Script::execute(DispatcherService *service, const KVList& parameters)
 			return false;
 		}
 	}
-	Logger::getLogger()->debug("Execute script %s", m_name.c_str());
+	Logger::getLogger()->debug("Execute script %s, Caller %s, type %s",
+				m_name.c_str(),
+				m_source_name.c_str(),
+				m_source_type.c_str());
+
 	int stepNo = 0;
 	for (auto it = m_steps.begin(); it != m_steps.end(); ++it)
 	{
@@ -48,15 +52,20 @@ bool Script::execute(DispatcherService *service, const KVList& parameters)
 		if (it->second)
 		{
 			bool res = it->second->execute(service, parameters);
+
 			if (!res)
 			{
-				Logger::getLogger()->info("Execute of %s failed at step %d", m_name.c_str(), stepNo);
+				Logger::getLogger()->info("Execute of %s failed at step %d",
+							m_name.c_str(),
+							stepNo);
 				return res;
 			}
 		}
 		else
 		{
-			Logger::getLogger()->error("Script %s hsa an invalid step %d", m_name.c_str(), stepNo);
+			Logger::getLogger()->error("Script %s hsa an invalid step %d",
+						m_name.c_str(),
+						stepNo);
 			return false;
 		}
 	}
@@ -72,6 +81,15 @@ bool Script::execute(DispatcherService *service, const KVList& parameters)
 bool Script::load(DispatcherService *service)
 {
 	Logger *log = Logger::getLogger();
+
+	log->debug("Loading script '%s' for service '%s', i"
+			"caller name '%s', type '%s', URL '%s'",
+			m_name.c_str(),
+			service->getName().c_str(),
+			m_source_name.c_str(),
+			m_source_type.c_str(),
+			m_request_url.c_str());
+
 	StorageClient *storage = service->getStorageClient();
 
 	Where *where = new Where("name", Equals, m_name);
@@ -85,8 +103,31 @@ bool Script::load(DispatcherService *service)
 			delete result;
 		return false;
 	}
+
 	ResultSet::RowIterator row = result->firstRow();
-	ResultSet::ColumnValue *scriptCol = (*row)->getColumn("steps");
+	ResultSet::ColumnValue *scriptCol;
+	try
+	{
+		scriptCol = (*row)->getColumn("steps");
+	}
+	catch(ResultNoSuchColumnException *e)
+	{
+		log->error("Script '%s' does not have 'steps' column",
+			m_name.c_str());
+		delete e;
+		if (result)
+			delete result;
+		return false;
+
+	}
+	catch(...)
+	{
+		log->error("Script '%s': found generic exception while fetching 'steps' column",
+			m_name.c_str());
+		if (result)
+			delete result;
+		return false;
+	}
 
 	// Data in "steps" might be string or JSON
 	const rapidjson::Value *doc;
@@ -112,7 +153,8 @@ bool Script::load(DispatcherService *service)
 		{
 			log->error("Parse error in script %s: %s (%u)",
 					m_name.c_str(),
-					GetParseError_En(ok.Code()), ok.Offset());
+					GetParseError_En(ok.Code()),
+					ok.Offset());
 			log->error("Script %s is: %s", m_name.c_str(), str);
 			delete result;
 			return false;
@@ -138,6 +180,35 @@ bool Script::load(DispatcherService *service)
 		return false;
 	}
 
+	// Load ACL
+	ResultSet::ColumnValue *scriptAcl;
+	try
+	{
+		scriptAcl = (*row)->getColumn("acl");
+	}
+	catch(ResultNoSuchColumnException *e)
+	{
+		log->error("Script '%s' does not have 'acl' column",
+			m_name.c_str());
+		delete e;
+		delete result;
+		return false;
+	}
+	catch(...)
+	{
+		log->error("Script '%s': found generic exception while fetching 'acl' column",
+			m_name.c_str());
+		delete result;
+		return false;
+	}
+
+	if (!validateACL(service, scriptAcl))
+	{
+		delete result;
+		return false;
+	}
+	
+	// We can continue parsing script steps
 	if (doc->IsArray())
 	{
 		for (auto& item : doc->GetArray())
@@ -165,6 +236,11 @@ bool Script::load(DispatcherService *service)
 						ScriptStep *s = parseStep(type, step);
 						if (s != NULL)
 						{
+							// Pass caller information
+							s->setSourceName(m_source_name);
+							s->setSourceType(m_source_type);
+							s->setRequestURL(m_request_url);
+
 							if (!addStep(order, s))
 							{
 								log->error("Control script '%s' has more than one step with order of %d", m_name.c_str(), order);
@@ -465,7 +541,13 @@ bool WriteScriptStep::execute(DispatcherService *service, const KVList& paramete
 	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
 	payload += " }";
-	return service->sendToService(m_service, "/fledge/south/setpoint", payload);
+
+	// Pass m_source_name & m_source_type to south service
+	return service->sendToService(m_service,
+				"/fledge/south/setpoint",
+				payload,
+				m_source_name,
+				m_source_type);
 }
 
 /**
@@ -493,7 +575,13 @@ bool OperationScriptStep::execute(DispatcherService *service, const KVList& para
 		payload += m_parameters.toJSON();
 	}
 	payload += " }";
-	return service->sendToService(m_service, "/fledge/south/operation", payload);
+
+	// Pass m_source_name & m_source_type to south service
+	return service->sendToService(m_service,
+				"/fledge/south/operation",
+				payload,
+				m_source_name,
+				m_source_type);
 }
 
 /**
@@ -512,6 +600,12 @@ bool ScriptScriptStep::execute(DispatcherService *service, const KVList& paramet
 
 	// TODO Execution of scripts on the background
 	Script script(m_name);
+
+	// Set m_source_name, m_source_name and m_request_url in the Script object
+	script.setSourceName(m_source_name);
+	script.setSourceType(m_source_type);
+	script.setRequestURL(m_request_url);
+
 	return script.execute(service, parameters);
 }
 
@@ -528,6 +622,238 @@ bool ConfigScriptStep::execute(DispatcherService *service, const KVList& paramet
 	{
 		return true;
 	}
-	service->getManagementClient()->setCategoryItemValue(m_category, m_name, m_value);
+	service->getMgmtClient()->setCategoryItemValue(m_category, m_name, m_value);
 }
 
+/**
+ * Load ACL for the script and match against:
+ * m_source_name, m_source_type and m_request_url
+ *
+ * @param service	The service object
+ * @param scriptAcl	The Database ColumnValue for ACL
+ * @return		True is ACL exists and amched
+ *			True if ACL does not exist
+ *			False if ACL exists and no match
+ */
+bool Script::validateACL(DispatcherService *service,
+			ResultSet::ColumnValue *scriptAcl)
+{
+	Logger *log = Logger::getLogger();
+	StorageClient *storage = service->getStorageClient();
+
+	// Check scriptAcl is a STRING_COLUMN
+	if (scriptAcl->getType() == ColumnType::STRING_COLUMN)
+	{
+		char *str = scriptAcl->getString();
+		if (strcmp(str, "") == 0)
+		{
+			log->debug("Script '%s' has no ACL set",
+				m_name.c_str());
+			// No ACL to load
+			return true;
+		}
+
+		log->debug("Script '%s' has ACL '%s', loading it",
+			m_name.c_str(),
+			str);
+
+		// Need to load the ACL
+		Where *where = new Where("name", Equals, str);
+		Query scriptQuery(where);
+		ResultSet *result = storage->queryTable(ACL_TABLE, scriptQuery);
+		if (!result || result->rowCount() != 1)
+		{
+			log->error("Unable to retrieve a control acl '%s' for script '%s",
+				str,
+				m_name.c_str());
+			if (result)
+			{
+				delete result;
+			}
+			return false;
+		}
+
+		// TODO add try/catch
+		ResultSet::RowIterator row = result->firstRow();
+		ResultSet::ColumnValue *serviceCol = (*row)->getColumn("service");
+
+		if (serviceCol->getType() != ColumnType::JSON_COLUMN)
+		{
+			log->error("Script '%s' ACL '%s': 'service' item is not a JSON data type");
+			if (result)
+			{
+				delete result;
+			}
+			return false;
+		}
+
+		// Check services, by name or type: set matched bool var
+		const rapidjson::Value *docS = serviceCol->getJSON();
+
+		if (!docS->IsArray())
+		{
+			log->error("Script '%s' ACL '%s': 'service' item is not an array");
+			if (result)
+			{
+				delete result;
+			}
+			return false;
+		}
+
+		bool matchedServiceName = false;
+		bool matchedServiceType = false;
+
+		// Empty array: allow all
+		if (docS->GetArray().Size() == 0)
+		{
+			matchedServiceName = true;
+			matchedServiceType = true;
+		}
+
+		// Iterate 'service' array
+		for (auto& item : docS->GetArray())
+		{
+			if (item.IsObject())
+			{
+				for (auto& itemValue : item.GetObject())
+				{
+					string key = itemValue.name.GetString();
+					string value = itemValue.value.GetString();
+
+					// Match service name
+					matchedServiceName = (key == "name") && (value == m_source_name);
+					if (matchedServiceName)
+					{
+						break;
+					}
+					// Math service type
+					matchedServiceType = (key == "type") && (value == m_source_type);
+					if (matchedServiceType)
+					{
+						break;
+					}
+				}
+			}
+		}
+
+		if (!matchedServiceType && !matchedServiceName)
+		{
+			log->error("Execution not allowed to script '%s' "
+				"for caller service '%s', type '%s'",
+				m_name.c_str(),
+				m_source_name.c_str(),
+				m_source_type.c_str());
+			delete result;
+			return false;
+		}
+
+		// TODO add try/catch
+		// Check URL with value and acl by service type
+		ResultSet::ColumnValue *urlCol = (*row)->getColumn("url");
+		if (urlCol->getType() != ColumnType::JSON_COLUMN)
+		{
+			log->error("Script '%s' ACL '%s': 'url' item is not a JSON data type");
+			if (result)
+			{
+				delete result;
+			}
+			return false;
+		}
+
+		const rapidjson::Value *docU = urlCol->getJSON();
+		if (!docU->IsArray())
+		{
+			log->error("Script '%s' ACL '%s': 'service' item is not an array");
+			if (result)
+			{
+				delete result;
+			}
+			return false;
+		}
+
+		matchedServiceType = false;
+		bool matchedUrl = false;
+
+		// Empty array: allow all
+		if (docU->GetArray().Size() == 0)
+		{
+			matchedServiceType = true;
+			matchedUrl = true;
+		}
+		// Iterate 'service' array
+		for (auto& item : docU->GetArray())
+		{
+			if (item.IsObject())
+			{
+				string url;
+				for (auto& itemValue : item.GetObject())
+				{
+					string key = itemValue.name.GetString();
+					if (key == "url")
+					{
+						url = itemValue.value.GetString();
+						if (url != "")
+						{
+							matchedUrl = (url == m_request_url);
+						}
+					}
+					if (key == "acl")
+					{
+						if (itemValue.value.IsArray())
+						{
+							// Empty ACL array for service type: matchedServiceType is true
+							matchedServiceType = (itemValue.value.GetArray().Size() == 0);
+
+							for (auto& a : itemValue.value.GetArray())
+							{
+								if (a.IsObject())
+								{
+									for (auto& iv : a.GetObject())
+									{
+										string key = iv.name.GetString();
+										string value = iv.value.GetString();
+										// Math service type
+										matchedServiceType = (key == "type") &&
+												(value == m_source_type);
+										if (matchedServiceType)
+										{
+											break;
+										}
+									}
+								}
+							}
+						}
+					}
+
+					if (matchedUrl || matchedServiceType)
+					{
+						break;
+					}
+				}
+			}
+		}
+
+		if (!matchedServiceType && !matchedUrl)
+		{
+			log->error("Execution not allowed to script '%s' "
+				" for caller URL '%s', service name '%s', type '%s'",
+				m_name.c_str(),
+				m_source_name.c_str(),
+				m_source_type.c_str(),
+				m_request_url.c_str());
+			delete result;
+			return false;
+		}
+
+		// Remove fetched dataset
+		delete result;
+	}
+	else
+	{
+		log->error("Loading script '%s', ACL item is not a string data type",
+			m_name.c_str());
+		return false;
+	}
+
+	return true;
+}

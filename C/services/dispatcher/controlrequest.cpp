@@ -26,8 +26,15 @@ void ControlWriteServiceRequest::execute(DispatcherService *service)
 	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
 	payload += " }";
+
 	Logger::getLogger()->debug("Send payload to service '%s'", payload.c_str());
-	service->sendToService(m_service, "/fledge/south/setpoint", payload);
+
+	// Pass m_source_name & m_source_type to south service
+	service->sendToService(m_service,
+				"/fledge/south/setpoint",
+				payload,
+				m_source_name,
+				m_source_type);
 }
 
 /**
@@ -38,7 +45,7 @@ void ControlWriteServiceRequest::execute(DispatcherService *service)
 void ControlWriteBroadcastRequest::execute(DispatcherService *service)
 {
 	vector<ServiceRecord *> services;
-	service->getManagementClient()->getServices(services, "Southbound");
+	service->getMgmtClient()->getServices(services, "Southbound");
 
 	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
@@ -47,7 +54,12 @@ void ControlWriteBroadcastRequest::execute(DispatcherService *service)
 	for (auto& record : services)
 	{
 		try {
-			service->sendToService(record->getName(), "/fledge/south/setpoint", payload);
+			// Pass m_source_name & m_source_type to south service
+			service->sendToService(record->getName(),
+						"/fledge/south/setpoint",
+						payload,
+						m_source_name,
+						m_source_type);
 		} catch (...) {
 			Logger::getLogger()->info("Service '%s' does not support write operation", record->getName().c_str());
 		}
@@ -62,6 +74,12 @@ void ControlWriteBroadcastRequest::execute(DispatcherService *service)
 void ControlWriteScriptRequest::execute(DispatcherService *service)
 {
 	Script script(m_scriptName);
+
+	// Set m_source_name, m_source_name and m_request_url in the Script object
+	script.setSourceName(m_source_name);
+	script.setSourceType(m_source_type);
+	script.setRequestURL(m_request_url);
+
 	script.execute(service, m_values);
 }
 
@@ -80,7 +98,13 @@ void ControlWriteAssetRequest::execute(DispatcherService *service)
 		string payload = "{ \"values\" : ";
 		payload += m_values.toJSON();
 		payload += " }";
-		service->sendToService(ingestService, "/fledge/south/setpoint", payload);
+
+		// Pass m_source_name & m_source_type to south service
+		service->sendToService(ingestService,
+				"/fledge/south/setpoint",
+				payload,
+				m_source_name,
+				m_source_type);
 	} catch (...) {
 		Logger::getLogger()->error("Unable to fetch service that ingests asset %s",
 				m_asset.c_str());
@@ -103,7 +127,13 @@ void ControlOperationServiceRequest::execute(DispatcherService *service)
 		payload += m_parameters.toJSON();
 	}
 	payload += " }";
-	service->sendToService(m_service, "/fledge/south/operation", payload);
+
+	// Pass m_source_name & m_source_type to south service
+	service->sendToService(m_service,
+				"/fledge/south/operation",
+				payload,
+				m_source_name,
+				m_source_type);
 }
 
 /**
@@ -126,7 +156,13 @@ void ControlOperationAssetRequest::execute(DispatcherService *service)
 			payload += m_parameters.toJSON();
 		}
 		payload += " }";
-		service->sendToService(ingestService, "/fledge/south/operation", payload);
+
+		// Pass m_source_name & m_source_type to south service
+		service->sendToService(ingestService,
+					"/fledge/south/operation",
+					payload,
+					m_source_name,
+					m_source_type);
 	} catch (...) {
 		Logger::getLogger()->error("Unable to fetch service that ingests asset %s",
 				m_asset.c_str());
@@ -141,7 +177,7 @@ void ControlOperationAssetRequest::execute(DispatcherService *service)
 void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 {
 	vector<ServiceRecord *> services;
-	service->getManagementClient()->getServices(services, PLUGIN_TYPE_SOUTH);
+	service->getMgmtClient()->getServices(services, PLUGIN_TYPE_SOUTH);
 
 	string payload = "{ \"operation\" : \"";
 	payload += m_operation;
@@ -155,6 +191,11 @@ void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 	
 	for (auto& record : services)
 	{
-		service->sendToService(record->getName(), "/fledge/south/operation", payload);
+		// Pass m_source_name & m_source_type to south service
+		service->sendToService(record->getName(),
+					"/fledge/south/operation",
+					payload,
+					m_source_name,
+					m_source_type);
 	}
 }

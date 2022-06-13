@@ -127,6 +127,29 @@ void DispatcherApi::wait() {
 void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 				      shared_ptr<HttpServer::Request> request)
 {
+	// Get authentication enabled value
+	bool auth_set = m_service->getAuthenticatedCaller();
+
+	Logger::getLogger()->debug("Service '%s' has AuthenticatedCaller flag set %d",
+				m_service->getName().c_str(),
+				auth_set);
+
+	string callerName, callerType;
+
+	// If authentication is set verify input token and service/URL ACLs
+	if (auth_set)
+	{
+		// Verify access token from caller and check caller can access dispatcher
+		// Routine sends HTTP reply in case of errors
+		if (!m_service->AuthenticationMiddlewareCommon(response,
+					request,
+					callerName,
+					callerType))
+		{
+			return;
+		}
+	}
+
 	string destination, name, key, value;
 	string payload = request->content.string();
 	try {
@@ -193,6 +216,15 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 				}
 				if (writeRequest)
 				{
+					// If authentication is set then add service name/type
+					if (auth_set)
+					{
+						// Add caller name and type
+						writeRequest->setSourceName(callerName);
+						writeRequest->setSourceType(callerType);
+					}
+
+					// Add request to the queue
 					queueRequest(writeRequest);
 				}
 			}
@@ -221,6 +253,30 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 {
 	string destination, name, key, value;
 	string payload = request->content.string();
+
+	// Get authentication enabled value
+	bool auth_set = m_service->getAuthenticatedCaller();
+
+	Logger::getLogger()->debug("Service '%s' has AuthenticatedCaller flag set %d",
+				m_service->getName().c_str(),
+				auth_set);
+
+	string callerName, callerType;
+
+	// If authentication is set verify input token and service/URL ACLs
+	if (auth_set)
+	{
+		// Verify access token from caller and check caller can access dispatcher
+		// Routine sends HTTP reply in case of errors
+		if (!m_service->AuthenticationMiddlewareCommon(response,
+								request,
+								callerName,
+								callerType))
+		{
+			return;
+		}
+	}
+
 	try {
 		Document doc;
 		ParseResult result = doc.Parse(payload.c_str());
@@ -284,6 +340,14 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 					}
 					if (opRequest)
 					{
+						// If authentication is set then add service name/type
+						if (auth_set)
+						{
+							// Add caller name and type
+							opRequest->setSourceName(callerName);
+							opRequest->setSourceType(callerType);
+						}
+
 						queueRequest(opRequest);
 					}
 				}
@@ -366,6 +430,9 @@ void DispatcherApi::initResources()
 	m_server->default_resource["GET"] = defaultWrapper;
 	m_server->default_resource["POST"] = defaultWrapper;
 	m_server->default_resource["DELETE"] = defaultWrapper;
+
+	// writeWrapper and operationWrapper
+	// call AuthenticationMiddlewareCommon
 	m_server->resource[DISPATCH_WRITE]["POST"] = writeWrapper;
 	m_server->resource[DISPATCH_OPERATION]["POST"] = operationWrapper;
 }
@@ -434,3 +501,4 @@ bool DispatcherApi::queueRequest(ControlRequest *request)
 {
 	return m_service->queue(request);
 }
+
