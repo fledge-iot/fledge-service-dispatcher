@@ -51,6 +51,11 @@ class DispatcherService : public ServiceHandler
 		void			worker();
 		bool			sendToService(const std::string& service, 
 						const std::string& url, const std::string& payload);
+		void			configChildCreate(const std::string& parent_category,
+							const std::string&,
+							const std::string&) {};
+		void			configChildDelete(const std::string& parent_category,
+							const std::string&) {};
 
 	private:
 		ControlRequest		*getRequest();
