@@ -58,6 +58,7 @@ class DispatcherService : public ServiceAuthHandler
 							const std::string&) {};
 		void			configChildDelete(const std::string& parent_category,
 							const std::string&) {};
+		void			setDryRun() { m_dryRun = true; };
 
 	private:
 		ControlRequest		*getRequest();
@@ -77,5 +78,6 @@ class DispatcherService : public ServiceAuthHandler
 		std::condition_variable		m_cv;
 		bool				m_stopping;
 		bool				m_enable;
+		bool				m_dryRun;
 };
 #endif

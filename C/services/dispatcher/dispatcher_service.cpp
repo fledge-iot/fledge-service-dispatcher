@@ -44,7 +44,8 @@ static void worker_thread(void *data)
 DispatcherService::DispatcherService(const string& myName, const string& token) :
 					 m_shutdown(false),
 					 m_token(token),
-					 m_stopping(false)
+					 m_stopping(false),
+					 m_dryRun(false)
 {
 	m_name = myName;
 	// Default to a dynamic port
@@ -238,74 +239,76 @@ bool DispatcherService::start(string& coreAddress,
 		m_enable = true;
 	}
 
-	ConfigCategory category = m_mgtClient->getCategory(advancedCatName);
-	if (category.itemExists("logLevel"))
+	if (!m_dryRun)
 	{
-		m_logger->setMinLevel(category.getValue("logLevel"));
-	}
-
-	if (category.itemExists("dispatcherThreads"))
-	{
-		long val = atol(category.getValue("dispatcherThreads").c_str());
-		if (val <= 0)
+		ConfigCategory category = m_mgtClient->getCategory(advancedCatName);
+		if (category.itemExists("logLevel"))
 		{
-			m_worker_threads = DEFAULT_WORKER_THREADS;
+			m_logger->setMinLevel(category.getValue("logLevel"));
 		}
-		else
+
+		if (category.itemExists("dispatcherThreads"))
 		{
-			m_worker_threads = val;
+			long val = atol(category.getValue("dispatcherThreads").c_str());
+			if (val <= 0)
+			{
+				m_worker_threads = DEFAULT_WORKER_THREADS;
+			}
+			else
+			{
+				m_worker_threads = val;
+			}
 		}
+
+		// Get Storage service
+		ServiceRecord storageInfo("", "Storage");
+		if (!m_mgtClient->getService(storageInfo))
+		{
+			m_logger->fatal("Unable to find Fledge storage "
+					"connection info for service '" + m_name + "'");
+
+			this->cleanupResources();
+
+			// Unregister from Fledge
+			m_mgtClient->unregisterService();
+
+			return false;
+		}
+		m_logger->info("Connecting to storage on %s:%d",
+			       storageInfo.getAddress().c_str(),
+			       storageInfo.getPort());
+
+		// Setup StorageClient
+		StorageClient storageClient(storageInfo.getAddress(),
+					    storageInfo.getPort());
+		m_storage = &storageClient;
+
+		m_mgtClient->addAuditEntry("DSPST",
+						"INFORMATION",
+						"{\"name\": \"" + m_name + "\"}");
+
+		// Create default security category
+		this->createSecurityCategories(m_mgtClient);
+
+		// Start the worker threads
+		for (int i = 0; i < m_worker_threads; i++)
+		{
+			new thread(worker_thread, this);
+		}
+		// .... wait until shutdown ...
+
+		// Wait for all the API threads to complete
+		m_api->wait();
+
+		// Shutdown is starting ...
+		// NOTE:
+		// - Dispatcher API listener is already down.
+		// - all xyz already unregistered
+
+		m_mgtClient->addAuditEntry("DSPSD",
+						"INFORMATION",
+						"{\"name\": \"" + m_name + "\"}");
 	}
-
-	// Get Storage service
-	ServiceRecord storageInfo("", "Storage");
-	if (!m_mgtClient->getService(storageInfo))
-	{
-		m_logger->fatal("Unable to find Fledge storage "
-				"connection info for service '" + m_name + "'");
-
-		this->cleanupResources();
-
-		// Unregister from Fledge
-		m_mgtClient->unregisterService();
-
-		return false;
-	}
-	m_logger->info("Connecting to storage on %s:%d",
-		       storageInfo.getAddress().c_str(),
-		       storageInfo.getPort());
-
-	// Setup StorageClient
-	StorageClient storageClient(storageInfo.getAddress(),
-				    storageInfo.getPort());
-	m_storage = &storageClient;
-
-	m_mgtClient->addAuditEntry("DSPST",
-					"INFORMATION",
-					"{\"name\": \"" + m_name + "\"}");
-
-	// Create default security category
-	this->createSecurityCategories(m_mgtClient);
-
-	// Start the worker threads
-	for (int i = 0; i < m_worker_threads; i++)
-	{
-		new thread(worker_thread, this);
-	}
-	// .... wait until shutdown ...
-
-	// Wait for all the API threads to complete
-	m_api->wait();
-
-	// Shutdown is starting ...
-	// NOTE:
-	// - Dispatcher API listener is already down.
-	// - all xyz already unregistered
-
-	m_mgtClient->addAuditEntry("DSPSD",
-					"INFORMATION",
-					"{\"name\": \"" + m_name + "\"}");
-
 	// Unregister from storage service
 	m_mgtClient->unregisterService();
 
