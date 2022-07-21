@@ -288,7 +288,7 @@ bool DispatcherService::start(string& coreAddress,
 						"{\"name\": \"" + m_name + "\"}");
 
 		// Create default security category
-		this->createSecurityCategories(m_mgtClient);
+		this->createSecurityCategories(m_mgtClient, m_dryRun);
 
 		// Start the worker threads
 		for (int i = 0; i < m_worker_threads; i++)
