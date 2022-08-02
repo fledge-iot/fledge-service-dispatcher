@@ -47,7 +47,12 @@ DispatcherService::DispatcherService(const string& myName, const string& token) 
 					 m_stopping(false),
 					 m_dryRun(false)
 {
+	// Set name
 	m_name = myName;
+
+	// Set type
+	m_type = SERVICE_TYPE;
+
 	// Default to a dynamic port
 	unsigned short servicePort = 0;
 
