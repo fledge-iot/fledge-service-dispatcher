@@ -45,7 +45,8 @@ DispatcherService::DispatcherService(const string& myName, const string& token) 
 					 m_shutdown(false),
 					 m_token(token),
 					 m_stopping(false),
-					 m_dryRun(false)
+					 m_dryRun(false),
+					 m_restartRequest(false)
 {
 	// Set name
 	m_name = myName;
@@ -314,8 +315,17 @@ bool DispatcherService::start(string& coreAddress,
 						"INFORMATION",
 						"{\"name\": \"" + m_name + "\"}");
 	}
-	// Unregister from storage service
-	m_mgtClient->unregisterService();
+
+	if (m_restartRequest)
+	{
+		// Request the core to restart the service
+		m_mgtClient->restartService();
+	}
+	else
+	{
+		// Unregister from storage service
+		m_mgtClient->unregisterService();
+	}
 
 	// Stop management API
 	m_managementApi->stop();
@@ -345,6 +355,18 @@ void DispatcherService::shutdown()
 {
 	m_shutdown = true;
 	m_logger->info("Dispatcher service '" + m_name + "' shutdown in progress ...");
+
+	this->stop();
+}
+
+/**
+ * Restart request
+ */
+void DispatcherService::restart()
+{
+	m_restartRequest = true;
+	m_shutdown = true;
+	m_logger->info("Dispatcher service '" + m_name + "' restart in progress ...");
 
 	this->stop();
 }
