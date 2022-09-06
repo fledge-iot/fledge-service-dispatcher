@@ -360,7 +360,7 @@ void DispatcherService::shutdown()
 }
 
 /**
- * Restart request
+ * Restart request. Shut down the service and request the core to restart the service
  */
 void DispatcherService::restart()
 {
