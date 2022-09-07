@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
 	string	       myName = SERVICE_NAME;
 	string	       logLevel = "warning";
 	string	       token = "";
+	bool	       dryRun = false;
 
 	signal(SIGSEGV, handler);
 	signal(SIGILL, handler);
@@ -91,6 +92,10 @@ int main(int argc, char *argv[])
 		{
 			token = &argv[i][8];
 		}
+		else if (!strncmp(argv[i], "--dryrun", 8))
+		{
+			dryRun = true;
+		}
 	}
 
 	if (daemonMode && makeDaemon() == -1)
@@ -109,6 +114,11 @@ int main(int argc, char *argv[])
 	// Instantiate the DispatcherService class
 	service = new DispatcherService(myName, token);
 	Logger::getLogger()->setMinLevel(logLevel);
+
+	if (dryRun)
+	{
+		service->setDryRun();
+	}
 
 	// Start the Dispatcher service
 	service->start(coreAddress, corePort);
