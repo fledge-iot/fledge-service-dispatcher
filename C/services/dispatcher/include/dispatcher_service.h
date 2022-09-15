@@ -16,15 +16,22 @@
 #include <reading.h>
 #include <storage_client.h>
 #include <dispatcher_api.h>
+#include <controlrequest.h>
+#include <mutex>
+#include <condition_variable>
+#include <queue>
 
 #define SERVICE_NAME		"Fledge Dispatcher"
 #define SERVICE_TYPE		"Dispatcher"
-#define DISPATCHER_CATEGORY	"Dispatcher"
-#define DEFAULT_WORKER_THREADS 2
+#define DEFAULT_WORKER_THREADS	2
+
 /**
  * The DispatcherService class.
+ *
+ * The main class responsible for managing requests, handling the queues and interfacing
+ * to the other Fledge services.
  */
-class DispatcherService : public ServiceHandler
+class DispatcherService : public ServiceAuthHandler
 {
 	public:
 		DispatcherService(const std::string& name, const std::string& token = "");
@@ -33,24 +40,46 @@ class DispatcherService : public ServiceHandler
 					      unsigned short corePort);
 		void 			stop();
 		void			shutdown();
+		void			restart();
+		bool			isRunning() { return !m_stopping; };
 		void			cleanupResources();
 		void			configChange(const std::string&,
 						     const std::string&);
 		void			registerCategory(const std::string& categoryName);
-		ManagementClient*	getManagementClient() { return m_managerClient; };
 		StorageClient*		getStorageClient() { return m_storage; };
+		bool			queue(ControlRequest *request);
+		void			worker();
+		bool			sendToService(const std::string& service, 
+						const std::string& url,
+						const std::string& payload,
+						const std::string& sourceName,
+						const std::string& sourceType);
+		void			configChildCreate(const std::string& parent_category,
+							const std::string&,
+							const std::string&) {};
+		void			configChildDelete(const std::string& parent_category,
+							const std::string&) {};
+		void			setDryRun() { m_dryRun = true; };
 
 	private:
-		const std::string	m_name;
-		Logger*			m_logger;
-		bool			m_shutdown;
-		DispatcherApi*		m_api;
-		ManagementClient* 	m_managerClient;
-		ManagementApi*		m_managementApi;
-		StorageClient*		m_storage;
+		ControlRequest		*getRequest();
+
+	private:
+		Logger*				m_logger;
+		bool				m_shutdown;
+		DispatcherApi*			m_api;
+		ManagementApi*			m_managementApi;
+		StorageClient*			m_storage;
 		std::map<std::string, bool>
-					m_registerCategories;
-		unsigned long		m_worker_threads;
-		const std::string       m_token;
+						m_registerCategories;
+		unsigned long			m_worker_threads;
+		const std::string       	m_token;
+		std::queue<ControlRequest *>	m_requests;
+		std::mutex			m_mutex;
+		std::condition_variable		m_cv;
+		bool				m_stopping;
+		bool				m_enable;
+		bool				m_dryRun;
+		bool				m_restartRequest;
 };
 #endif

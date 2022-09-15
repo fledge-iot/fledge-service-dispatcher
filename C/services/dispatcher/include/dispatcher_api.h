@@ -19,7 +19,13 @@ using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
 /*
  * URL for each API entry point
  */
+#define	DISPATCH_WRITE			"/dispatch/write"
+#define DISPATCH_OPERATION		"/dispatch/operation"
+
 #define ESCAPE_SPECIAL_CHARS		"\\{\\}\\\"\\(\\)\\!\\[\\]\\^\\$\\.\\|\\?\\*\\+\\-"
+
+class ControlRequest;
+class DispatcherService;
 
 /**
  * DispatcherApi is the entry point for:
@@ -34,7 +40,7 @@ class DispatcherApi
 		~DispatcherApi();
 		static		DispatcherApi *getInstance();
 		void		initResources();
-		void		start();
+		void		start(DispatcherService *service);
 		void		startServer();
 		void		wait();
 		void		stop();
@@ -42,6 +48,10 @@ class DispatcherApi
 		unsigned short	getListenerPort();
 		std::string	decodeName(const std::string& name);
 		void		defaultResource(shared_ptr<HttpServer::Response> response,
+						shared_ptr<HttpServer::Request> request);
+		void		write(shared_ptr<HttpServer::Response> response,
+						shared_ptr<HttpServer::Request> request);
+		void		operation(shared_ptr<HttpServer::Response> response,
 						shared_ptr<HttpServer::Request> request);
 
 	private:
@@ -52,6 +62,7 @@ class DispatcherApi
 		void		respond(shared_ptr<HttpServer::Response>,
 					SimpleWeb::StatusCode,
 					const string&);
+		bool		queueRequest(ControlRequest *);
 
 	private:
 		static DispatcherApi*		m_instance;
@@ -61,6 +72,7 @@ class DispatcherApi
 		thread*				m_thread;
 		std::string			m_callBackURL;
 		Logger*				m_logger;
+		DispatcherService		*m_service;
 };
 
 #endif
