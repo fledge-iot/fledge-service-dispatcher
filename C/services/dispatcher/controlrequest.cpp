@@ -177,7 +177,7 @@ void ControlOperationAssetRequest::execute(DispatcherService *service)
 void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 {
 	vector<ServiceRecord *> services;
-	service->getMgmtClient()->getServices(services, PLUGIN_TYPE_SOUTH);
+	service->getMgmtClient()->getServices(services, "Southbound");
 
 	string payload = "{ \"operation\" : \"";
 	payload += m_operation;
