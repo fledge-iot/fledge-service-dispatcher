@@ -553,8 +553,10 @@ bool DispatcherService::sendToService(const string& serviceName,
 			auto res = http.request("PUT", url, payload, headers);
 			if (res->status_code.compare("200 OK"))
 			{
-				Logger::getLogger()->error("Failed to send set point operation to service %s, %s",
-							serviceName.c_str(), res->status_code.c_str());
+				Logger::getLogger()->error(
+						"Failed to send set point operation to service %s, %s, %s",
+							serviceName.c_str(), res->status_code.c_str(),
+							res->content.string().c_str());
 				return false;
 			}
 		} catch (exception& e) {
