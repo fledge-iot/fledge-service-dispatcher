@@ -10,6 +10,7 @@
 #include <kvlist.h>
 #include <logger.h>
 #include <stdexcept>
+#include <string_utils.h>
 
 using namespace std;
 using namespace rapidjson;
@@ -84,7 +85,9 @@ string KVList::toJSON()
 		else
 			payload += ", ";
 		payload += "\"" + p.first + "\" :";
-		payload += "\"" + p.second + "\"";
+		string escaped = p.second;
+		StringEscapeQuotes(escaped);
+		payload += "\"" + escaped + "\"";
 	}
 	payload += " }";
 	return payload;
