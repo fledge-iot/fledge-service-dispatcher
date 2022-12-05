@@ -43,7 +43,14 @@ static void signalHandler(int signal)
 	if (service)
 	{
 		// Call stop() method in dispatcher service class
-		service->stop();
+		if (signal == SIGTERM)
+		{
+			service->restart();
+		}
+		else
+		{
+			service->stop();
+		}
 	}
 }
 
