@@ -46,7 +46,8 @@ DispatcherService::DispatcherService(const string& myName, const string& token) 
 					 m_token(token),
 					 m_stopping(false),
 					 m_dryRun(false),
-					 m_restartRequest(false)
+					 m_restartRequest(false),
+					 m_removeFromCore(true)
 {
 	// Set name
 	m_name = myName;
@@ -321,7 +322,7 @@ bool DispatcherService::start(string& coreAddress,
 		// Request the core to restart the service
 		m_mgtClient->restartService();
 	}
-	else
+	else if (m_removeFromCore)
 	{
 		// Unregister from storage service
 		m_mgtClient->unregisterService();
@@ -340,8 +341,12 @@ bool DispatcherService::start(string& coreAddress,
  * Unregister dispatcher xyz and
  * stop DispatcherAPi listener
  */
-void DispatcherService::stop()
+void DispatcherService::stop(bool remvoeFromCore)
 {
+	if(remvoeFromCore == false)
+	{
+		m_removeFromCore = false;
+	}
 	m_stopping = true;
 	m_cv.notify_all();
 	// Stop the DispatcherApi
