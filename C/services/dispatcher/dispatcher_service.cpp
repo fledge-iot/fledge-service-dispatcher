@@ -341,9 +341,9 @@ bool DispatcherService::start(string& coreAddress,
  * Unregister dispatcher xyz and
  * stop DispatcherAPi listener
  */
-void DispatcherService::stop(bool remvoeFromCore)
+void DispatcherService::stop(bool removeFromCore)
 {
-	if(remvoeFromCore == false)
+	if(removeFromCore == false)
 	{
 		m_removeFromCore = false;
 	}
