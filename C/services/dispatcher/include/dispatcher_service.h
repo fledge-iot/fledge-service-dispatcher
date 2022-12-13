@@ -38,7 +38,7 @@ class DispatcherService : public ServiceAuthHandler
 		~DispatcherService();
 		bool 			start(std::string& coreAddress,
 					      unsigned short corePort);
-		void 			stop();
+		void 			stop(bool removeFromCore=true);
 		void			shutdown();
 		void			restart();
 		bool			isRunning() { return !m_stopping; };
@@ -81,5 +81,6 @@ class DispatcherService : public ServiceAuthHandler
 		bool				m_enable;
 		bool				m_dryRun;
 		bool				m_restartRequest;
+		bool				m_removeFromCore;
 };
 #endif
