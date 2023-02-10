@@ -17,6 +17,7 @@
 #include <iostream>
 #include <string>
 #include <asset_tracking.h>
+#include <audit_logger.h>
 
 #include <storage_client.h>
 #include <config_handler.h>
@@ -149,6 +150,9 @@ bool DispatcherService::start(string& coreAddress,
 
 	// Make sure we have an instance of the asset tracker
 	AssetTracker *tracker = new AssetTracker(m_mgtClient, m_name);
+
+	// Add the AuditLogger single so that it is available for audit logging
+	AuditLogger *audit = new AuditLogger(m_mgtClient);
 
 	// Create a category with Dispatcher name
 	DefaultConfigCategory dispatcherServerConfig(m_name, string("{}"));
