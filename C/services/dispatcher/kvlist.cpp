@@ -138,3 +138,39 @@ void KVList::substitute(string& value, const KVList& values)
 	Logger::getLogger()->debug("became '%s'", rval.c_str());
 	value = rval;
 }
+
+/**
+ * Construct a reading from a key/value list
+ *
+ * @param asset		The asset name to use in the reading
+ * @return Rading*	A pointer to a newly created reading
+ */
+Reading *KVList::toReading(const string& asset)
+{
+vector<Datapoint *> values;
+
+	for (auto& item: m_list)
+	{
+		// TODO need to do something more sensible with types
+		DatapointValue dpv(item.second);
+		values.push_back(new Datapoint(item.first, dpv));
+	}
+	return new Reading(asset, values);
+}
+
+/**
+ * Replace the content of the Key/Value list with the datapoints in the
+ * reading that is passed in. The reading is left in tact upon return,
+ * it is the job of the caller to free the reading
+ *
+ * @param reading	The reading to extract new data from
+ */
+void KVList::fromReading(Reading *reading)
+{
+	m_list.clear();
+	vector<Datapoint *>datapoints = reading->getReadingData();
+	for (Datapoint *dp : datapoints)
+	{
+		add(dp->getName(), dp->getData().toString());
+	}
+}

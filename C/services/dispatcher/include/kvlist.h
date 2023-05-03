@@ -14,6 +14,7 @@
 #include <rapidjson/document.h>
 #include <string>
 #include <vector>
+#include <reading.h>
 
 /**
  * A list of Key/Value pairs encasulated in a class that
@@ -31,6 +32,8 @@ class KVList {
 		std::string		toJSON();
 		size_t			size() { return m_list.size(); };
 		void			substitute(const KVList& values);
+		Reading			*toReading(const std::string& asset);
+		void			fromReading(Reading *);
 
 	private:
 		void			substitute(std::string& value, const KVList& values);

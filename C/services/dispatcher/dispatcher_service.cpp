@@ -306,6 +306,11 @@ bool DispatcherService::start(string& coreAddress,
 		{
 			new thread(worker_thread, this);
 		}
+
+		// Start the control filter pipeline manager
+		m_pipelineManager = new ControlPipelineManager(m_mgtClient, m_storage);
+		m_pipelineManager->loadPipelines();
+
 		// .... wait until shutdown ...
 
 		// Wait for all the API threads to complete
@@ -483,7 +488,7 @@ bool DispatcherService::queue(ControlRequest *request)
 }
 
 /**
- * Return the nextr request to process or NULL if the service is shutting down
+ * Return the next request to process or NULL if the service is shutting down
  *
  * @return ControlRequest*	The next request to process
  */
