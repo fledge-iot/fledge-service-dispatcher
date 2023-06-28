@@ -32,7 +32,7 @@ typedef void (*filterReadingSetFn)(OUTPUT_HANDLE *outHandle, READINGSET* reading
  */
 class PipelineExecutionContext {
 	public:
-		PipelineExecutionContext(ManagementClient *management, const std::vector<std::string>& filters);
+		PipelineExecutionContext(ManagementClient *management, const std::string& name, const std::vector<std::string>& filters);
 		~PipelineExecutionContext();
 
 		Reading				*filter(Reading *reading);
@@ -54,6 +54,7 @@ class PipelineExecutionContext {
 		static void			useFilteredData(OUTPUT_HANDLE *outHandle, READINGSET* readings);
 
 	private:
+		std::string			m_name;
 		Logger				*m_logger;
 		ManagementClient		*m_management;
 		std::vector<std::string>	m_filters;

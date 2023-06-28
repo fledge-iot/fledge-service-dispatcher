@@ -53,38 +53,44 @@ ControlPipelineManager::loadPipelines()
 	Query allPipelines(columns);
 	try {
 		ResultSet *pipelines = m_storage->queryTable(PIPELINES_TABLE, allPipelines);
-		ResultSet::RowIterator it = pipelines->firstRow();
-		do {
-			ResultSet::Row *row = *it;
-			if (row)
+		if (pipelines->rowCount() > 0)
+		{
+			ResultSet::RowIterator it = pipelines->firstRow();
+			do
 			{
-				ResultSet::ColumnValue *cpid = row->getColumn("cpid");
-				ResultSet::ColumnValue *name = row->getColumn("name");
-				string pname = name->getString();
-
-				ControlPipeline *pipe = new ControlPipeline(this, name->getString());
-				if (!pipe)
+				ResultSet::Row *row = *it;
+				if (row)
 				{
-					m_logger->error("Failed to allocate the '%s' control pipeline",
-							pname.c_str());
-					break;
+					ResultSet::ColumnValue *cpid = row->getColumn("cpid");
+					ResultSet::ColumnValue *name = row->getColumn("name");
+					string pname = name->getString();
+
+					ControlPipeline *pipe = new ControlPipeline(this, name->getString());
+					if (!pipe)
+					{
+						m_logger->error("Failed to allocate the '%s' control pipeline",
+								pname.c_str());
+						break;
+					}
+					ResultSet::ColumnValue *cpsid = row->getColumn("stype");
+					PipelineEndpoint::EndpointType stype = m_sourceTypes[cpsid->getInteger()].m_type;
+					ResultSet::ColumnValue *sname = row->getColumn("sname");
+					PipelineEndpoint source(stype, sname->getString());
+					ResultSet::ColumnValue *cpdid = row->getColumn("dtype");
+					PipelineEndpoint::EndpointType dtype = m_destTypes[cpdid->getInteger()].m_type;
+					ResultSet::ColumnValue *dname = row->getColumn("dname");
+					PipelineEndpoint dest(dtype, dname->getString());
+					pipe->endpoints(source, dest);
+					// TODO add enabled and execution fields
+					vector<string> filters;
+					loadFilters(pname, cpid->getInteger(), filters);
+					pipe->setPipeline(filters);
+					m_pipelines[pname] = pipe;
 				}
-				ResultSet::ColumnValue *cpsid = row->getColumn("stype");
-				PipelineEndpoint::EndpointType stype = m_sourceTypes[cpsid->getInteger()].m_type;
-				ResultSet::ColumnValue *sname = row->getColumn("sname");
-				PipelineEndpoint source(stype, sname->getString());
-				ResultSet::ColumnValue *cpdid = row->getColumn("dtype");
-				PipelineEndpoint::EndpointType dtype = m_destTypes[cpdid->getInteger()].m_type;
-				ResultSet::ColumnValue *dname = row->getColumn("dname");
-				PipelineEndpoint dest(dtype, dname->getString());
-				pipe->endpoints(source, dest);
-				// TODO add enabled and execution fields
-				vector<string> filters;
-				loadFilters(pname, cpid->getInteger(), filters);
-				pipe->setPipeline(filters);
-				m_pipelines[pname] = pipe;
-			}
-		} while (pipelines->isLastRow(it++));
+				if (! pipelines->isLastRow(it))
+					it++;
+			} while (! pipelines->isLastRow(it));
+		}
 		delete pipelines;
 	} catch (exception* exp) {
 		m_logger->error("Exception loading control pipelines: %s", exp->what());
@@ -93,24 +99,26 @@ ControlPipelineManager::loadPipelines()
 	} catch (...) {
 		m_logger->error("Exception loading control pipelines");
 	}
+
+	m_logger->debug("%d pipelines have benn loaded", m_pipelines.size());
 	return;
 }
 
 /**
- * Populate the fitler names for the gven pipeline
+ * Populate the filter names for the given pipeline
  *
  * @param pipeline	The name of the pipeline
  * @param cpid		Control pipeline ID
- * @param filters	The array to populate with the fitler names
+ * @param filters	The array to populate with the filter names
  */
 void ControlPipelineManager::loadFilters(const string& pipeline, int cpid, vector<string>& filters)
 {
 	vector<Returns *>columns;
-	columns.push_back(new Returns ("fkname"));
-	Where where("cpid", Equals, to_string(cpid));
-	Sort orderby("forder");
-	Query allFilters(columns, &where);
-	allFilters.sort(&orderby);
+	columns.push_back(new Returns ("fname"));
+	Where *where = new Where("cpid", Equals, to_string(cpid));
+	Sort *orderby = new Sort("forder");
+	Query allFilters(columns, where);
+	allFilters.sort(orderby);
 	try {
 		ResultSet *results = m_storage->queryTable(PIPELINES_FILTER_TABLE, allFilters);
 		ResultSet::RowIterator it = results->firstRow();
@@ -118,7 +126,7 @@ void ControlPipelineManager::loadFilters(const string& pipeline, int cpid, vecto
 			ResultSet::Row *row = *it;
 			if (row)
 			{
-				ResultSet::ColumnValue *name = row->getColumn("fkname");
+				ResultSet::ColumnValue *name = row->getColumn("fname");
 				filters.emplace_back(name->getString());
 			}
 		} while (results->isLastRow(it++));
@@ -147,7 +155,11 @@ ControlPipelineManager::findPipeline(const PipelineEndpoint& source, const Pipel
 	for (auto const& pipe : m_pipelines)
 	{
 		if (pipe.second->match(source, dest))
+		{
+			m_logger->debug("%s exactly matches pipelines for source %s to destination %s",
+				pipe.second->getName().c_str(), source.toString().c_str(), dest.toString().c_str());
 			return pipe.second;
+		}
 	}
 	PipelineEndpoint any(PipelineEndpoint::EndpointAny);
 
@@ -155,24 +167,38 @@ ControlPipelineManager::findPipeline(const PipelineEndpoint& source, const Pipel
 	for (auto const& pipe : m_pipelines)
 	{
 		if (pipe.second->match(any, dest))
+		{
+			m_logger->debug("%s matches pipelines for source (ANY) %s to destination %s",
+				pipe.second->getName().c_str(), source.toString().c_str(), dest.toString().c_str());
 			return pipe.second;
+		}
 	}
 
-	// Look for a pipeline that matches our source and any destiantion
+	// Look for a pipeline that matches our source and any destination
 	for (auto const& pipe : m_pipelines)
 	{
 		if (pipe.second->match(source, any))
+		{
+			m_logger->debug("%s matches pipelines for source %s to destination (ANY) %s",
+				pipe.second->getName().c_str(), source.toString().c_str(), dest.toString().c_str());
 			return pipe.second;
+		}
 	}
 
 	// Finally look for any source and any destination
 	for (auto const& pipe : m_pipelines)
 	{
 		if (pipe.second->match(any, any))
+		{
+			m_logger->debug("%s matches pipelines for source %s to destination %s with generic any to any pipeline",
+				pipe.second->getName().c_str(), source.toString().c_str(), dest.toString().c_str());
 			return pipe.second;
+		}
 	}
 
-	// No ppelines matched
+	// No pipelines matched
+	m_logger->debug("No matching pipelines for source %s to destination %s",
+			source.toString().c_str(), dest.toString().c_str());
 	return NULL;
 }
 
@@ -224,37 +250,40 @@ void ControlPipelineManager::loadLookupTables()
 		m_logger->error("Exception loading control pipeline sources");
 	}
 
-	// Now  load the destiantion endpoints
+	// Now  load the destination endpoints
 	columns.clear();
-	columns.push_back(new Returns ("cpsid"));
+	columns.push_back(new Returns ("cpdid"));
 	columns.push_back(new Returns ("name"));
 	columns.push_back(new Returns ("description"));
 	Query allDest(columns);
 	try {
 		ResultSet *dests = m_storage->queryTable(DESTINATIONS_TABLE, allDest);
-		ResultSet::RowIterator it = dests->firstRow();
-		do {
-			ResultSet::Row *row = *it;
-			if (row)
-			{
-				ResultSet::ColumnValue *cpdid = row->getColumn("cpdid");
-				ResultSet::ColumnValue *name = row->getColumn("name");
-				ResultSet::ColumnValue *description = row->getColumn("description");
-				
-				PipelineEndpoint::EndpointType t = PipelineEndpoint::EndpointAny;
-				if (!strcmp(name->getString(),"Asset"))
-					t = PipelineEndpoint::EndpointAsset;
-				else if (!strcmp(name->getString(),"Service"))
-					t = PipelineEndpoint::EndpointService;
-				else if (!strcmp(name->getString(),"Broadcast"))
-					t = PipelineEndpoint::EndpointBroadcast;
-				else if (!strcmp(name->getString(),"Script"))
-					t = PipelineEndpoint::EndpointScript;
-				EndpointLookup epl(name->getString(), description->getString(), t);
-				m_destTypes[cpdid->getInteger()] = epl;
-			}
-		} while (dests->isLastRow(it++));
-		delete dests;
+		if (dests)
+		{
+			ResultSet::RowIterator it = dests->firstRow();
+			do {
+				ResultSet::Row *row = *it;
+				if (row)
+				{
+					ResultSet::ColumnValue *cpdid = row->getColumn("cpdid");
+					ResultSet::ColumnValue *name = row->getColumn("name");
+					ResultSet::ColumnValue *description = row->getColumn("description");
+					
+					PipelineEndpoint::EndpointType t = PipelineEndpoint::EndpointAny;
+					if (!strcmp(name->getString(),"Asset"))
+						t = PipelineEndpoint::EndpointAsset;
+					else if (!strcmp(name->getString(),"Service"))
+						t = PipelineEndpoint::EndpointService;
+					else if (!strcmp(name->getString(),"Broadcast"))
+						t = PipelineEndpoint::EndpointBroadcast;
+					else if (!strcmp(name->getString(),"Script"))
+						t = PipelineEndpoint::EndpointScript;
+					EndpointLookup epl(name->getString(), description->getString(), t);
+					m_destTypes[cpdid->getInteger()] = epl;
+				}
+			} while (dests->isLastRow(it++));
+			delete dests;
+		}
 	} catch (exception* exp) {
 		m_logger->error("Exception loading control pipeline destinations: %s", exp->what());
 	} catch (exception& ex) {

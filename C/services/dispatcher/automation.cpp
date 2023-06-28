@@ -40,10 +40,11 @@ bool Script::execute(DispatcherService *service, const KVList& parameters)
 			return false;
 		}
 	}
-	Logger::getLogger()->debug("Execute script %s, Caller %s, type %s",
+	Logger::getLogger()->debug("Execute script %s, Caller %s, type %s with parameters %s",
 				m_name.c_str(),
 				m_source_name.c_str(),
-				m_source_type.c_str());
+				m_source_type.c_str(),
+				parameters.toString().c_str());
 
 	int stepNo = 0;
 	for (auto it = m_steps.begin(); it != m_steps.end(); ++it)
@@ -82,7 +83,7 @@ bool Script::load(DispatcherService *service)
 {
 	Logger *log = Logger::getLogger();
 
-	log->debug("Loading script '%s' for service '%s', i"
+	log->debug("Loading script '%s' for service '%s', "
 			"caller name '%s', type '%s', URL '%s'",
 			m_name.c_str(),
 			service->getName().c_str(),

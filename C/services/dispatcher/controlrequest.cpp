@@ -214,7 +214,7 @@ void ControlOperationBroadcastRequest::execute(DispatcherService *service)
  * if one has been defined for the the particular control pipeline.
  *
  * This method will look for a best match pipeline for the control request
- * based on the source of the request and the destiantion of the request.
+ * based on the source of the request and the destination of the request.
  *
  * If a pipeline is found then it will fetch an execution context for the
  * pipeline and then the write request will be transformed into
@@ -226,12 +226,16 @@ void ControlOperationBroadcastRequest::execute(DispatcherService *service)
  */
 void WriteControlRequest::filter(ControlPipelineManager *manager)
 {
+	Logger::getLogger()->debug("Filtering the write request");
 	PipelineEndpoint destination = getDestination();
 	PipelineEndpoint source(PipelineEndpoint::EndpointAny);		// TODO need to get correct source
+	if (m_callerType.compare("service") == 0)
+		source = PipelineEndpoint(PipelineEndpoint::EndpointService, m_callerName);
 	ControlPipeline *pipeline = manager->findPipeline(source, destination);
 	if (!pipeline)
 	{
 		// Nothing to do
+		Logger::getLogger()->warn("No pipeline found to filter control request");
 		return;
 	}
 	PipelineExecutionContext *context = pipeline->getExecutionContext(source, destination);
@@ -253,7 +257,7 @@ void WriteControlRequest::filter(ControlPipelineManager *manager)
  * one has been defined for the particular source and destination.
  *
  * This method will look for a best match pipeline for the control request
- * based on the source of the request and the destiantion of the request.
+ * based on the source of the request and the destination of the request.
  *
  * If a pipeline is found then it will fetch an execution context for the
  * pipeline and then the write request will be transformed into

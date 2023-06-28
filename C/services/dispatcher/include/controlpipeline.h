@@ -139,12 +139,12 @@ class ControlPipeline {
 					}
 
 		/**
-		 * Return the set pipeline as a set of filter names
+		 * Return the pipeline as a set of filter names
 		 *
 		 * @return vector	A const reference to a vector of strings.
 		 */
 		const std::vector<std::string>&
-					getpipeline() const
+					getPipeline() const
 					{
 						return m_pipeline;
 					}

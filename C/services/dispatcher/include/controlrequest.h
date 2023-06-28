@@ -35,7 +35,7 @@ class ControlRequest {
 		 *
 		 * @param  source_name	The name of the authenticated caller
 		 */
-		void 	setSourceName(std::string& source_name)
+		void 	setSourceName(const std::string& source_name)
 		{
 			m_source_name = source_name;
 		};
@@ -47,7 +47,7 @@ class ControlRequest {
 		 *
 		 * @param source_type	The type of the authenticated caller
 		 */
-		void 	setSourceType(std::string& source_type)
+		void 	setSourceType(const std::string& source_type)
 		{
 			m_source_type = source_type;
 		};
@@ -59,15 +59,30 @@ class ControlRequest {
 		 *
 		 * @param source_type	The type of the authenticated caller
 		 */
-		void    setRequestURL(std::string& url)
+		void    setRequestURL(const std::string& url)
                 {
                         m_request_url = url;
                 };
+
+		/**
+		 * Add the caller information from the request. Used to
+		 * match the control pipeline.
+		 *
+		 * @param	type		The type of the caller
+		 * @param	name		The name of the caller
+		 */
+		void addCaller(const std::string& type, const std::string& name)
+		{
+			m_callerType = type;
+			m_callerName = name;
+		};
 
 	public:
 		std::string	m_source_name;
 		std::string	m_source_type;
 		std::string	m_request_url;
+		std::string	m_callerType;
+		std::string	m_callerName;
 };
 
 /**

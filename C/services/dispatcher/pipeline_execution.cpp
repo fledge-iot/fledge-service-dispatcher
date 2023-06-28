@@ -18,10 +18,11 @@ using namespace std;
  * Constructor for pipeline exeuction context
  *
  * @param management	A management client pointer
+ * @param name		The name of the pipeline this execution context is used for
  * @param filters	The list of filters to be run in the pipeline
  */
-PipelineExecutionContext::PipelineExecutionContext(ManagementClient *management, const vector<string>& filters) :
-	m_management(management), m_filters(filters)
+PipelineExecutionContext::PipelineExecutionContext(ManagementClient *management, const std::string& name, const vector<string>& filters) :
+	m_management(management), m_name(name), m_filters(filters)
 {
 	m_logger = Logger::getLogger();
 }
@@ -43,6 +44,7 @@ PipelineExecutionContext::loadPipeline()
 {
 bool rval = true;
 
+	m_logger->debug("Load Pipeline %s", m_name.c_str());
 	try
 	{
 		for (auto& categoryName : m_filters)
@@ -101,28 +103,30 @@ bool rval = true;
 	catch (ConfigItemNotFound* e)
 	{
 		delete e;
-		Logger::getLogger()->info("loadFilters: no filters configured for ");
+		Logger::getLogger()->info("loadFilters: no filters configured for pipeline %s", m_name.c_str());
 		return true;
 	}
 	catch (exception& e)
 	{
-		Logger::getLogger()->fatal("loadFilters: failed to handle ");
+		Logger::getLogger()->fatal("loadFilters: failed to handle exception for pipeline %s, %s",
+				m_name.c_str(), e.what());
 		return false;
 	}
 	catch (...)
 	{
-		Logger::getLogger()->fatal("loadFilters: generic exception while loading ");
+		Logger::getLogger()->fatal("loadFilters: generic exception while loading %s", m_name.c_str());
 		return false;
 	}
 
 	// The filters in the pipeline are now loaded. Connect them together
-	// to form the actual pipeline by calling the init methid of the plugin.
+	// to form the actual pipeline by calling the init method of the plugin.
 	// This is passed the now merged configuration category and the next step
 	// in the pipeline.
-	for (auto it = m_plugins.begin(); it != m_plugins.end(); ++it)
+	int i = 0;
+	for (auto it = m_plugins.begin(); it != m_plugins.end(); ++it, ++i)
 	{
 		FilterPlugin *plugin = *it;
-		ConfigCategory updatedCfg = m_management->getCategory(plugin->getName());
+		ConfigCategory updatedCfg = m_management->getCategory(m_filters[i]);
 		if ((it + 1) != m_plugins.end())
 		{
 			plugin->init(updatedCfg, *(it + 1), filterReadingSetFn(passToOnwardFilter));
@@ -183,7 +187,16 @@ Reading *PipelineExecutionContext::filter(Reading *reading)
 	 * Only one execution at a time per instance as the result
 	 * will appear in the member variable m_result
 	 */
-	m_mutex.lock();	
+	lock_guard<mutex> guard(m_mutex);
+
+	if (m_plugins.size() == 0)
+		loadPipeline();
+
+	if (m_plugins.size() == 0)
+	{
+		m_logger->warn("Failed to load pipeline %s", m_name.c_str());
+		return NULL;
+	}
 
 	/*
 	 * Create the reading set from the reading
@@ -193,16 +206,19 @@ Reading *PipelineExecutionContext::filter(Reading *reading)
 	READINGSET *readingSet = new READINGSET(vec);
 
 	/*
-	 * Pass the daat through the pipeline
+	 * Pass the data through the pipeline
 	 */
+	m_logger->debug("Filtering control request for piepline '%s', %s", m_name.c_str(), reading->toJSON().c_str());
 	m_plugins[0]->ingest(readingSet);
 
 	if (m_result && m_result->getCount() > 0)
 	{
 		Reading *result = m_result->getAllReadings()[0];
 		m_result->clear();
+		m_logger->debug("Result of filtering control request is %s", result->toJSON().c_str());
 		return result;
 	}
+	m_logger->info("Control filter pipeline %s removed control request", m_name.c_str());
 	return NULL;
 }
 
@@ -255,4 +271,3 @@ void PipelineExecutionContext::useFilteredData(OUTPUT_HANDLE *outHandle,
 	PipelineExecutionContext *context = (PipelineExecutionContext *)outHandle;
 	context->setResult(readingSet);
 }
-

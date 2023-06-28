@@ -85,8 +85,53 @@ class PipelineEndpoint {
 		 */
 		bool		match(const PipelineEndpoint& candidate) const
 				{
-					return candidate.m_type == m_type && (candidate.m_name.empty()
-						|| candidate.m_name.compare(m_name) == 0);
+					return m_type == EndpointAny ||
+						(candidate.m_type == m_type && (candidate.m_name.empty()
+						|| candidate.m_name.compare(m_name) == 0));
+				};
+
+		/**
+		 * Return a printable representation of the pipelien endpoint
+		 *
+		 * @return string	Printable form of the pipeline endpoint
+		 */
+		std::string	toString() const
+				{
+					std::string rval;
+					switch (m_type)
+					{
+						case EndpointUndefined:
+							rval = "Undefined";
+							break;
+						case EndpointAny:
+							rval = "Any";
+							break;
+						case EndpointService:
+							rval = "Service(" + m_name + ")";
+							break;
+						case EndpointAPI:
+							rval = "API(" + m_name + ")";
+							break;
+						case EndpointNotification:
+							rval = "Notification";
+							break;
+						case EndpointSchedule:
+							rval = "Schedule(" + m_name + ")";
+							break;
+						case EndpointScript:
+							rval = "Script(" + m_name + ")";
+							break;
+						case EndpointBroadcast:
+							rval = "Broadcast";
+							break;
+						case EndpointAsset:
+							rval = "Asset(" + m_name + ")";
+							break;
+						default:
+							rval = "Unknown(" + std::to_string(m_type) + ", " + m_name + ")";
+							break;
+					}
+					return rval;
 				};
 
 	private:

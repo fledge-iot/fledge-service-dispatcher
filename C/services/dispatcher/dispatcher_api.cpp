@@ -216,6 +216,11 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 				}
 				if (writeRequest)
 				{
+					if (doc.HasMember("source") && doc["source"].IsString() &&
+						doc.HasMember("source_name") && doc["source_name"].IsString())
+					{
+						writeRequest->addCaller(doc["source"].GetString(), doc["source_name"].GetString());
+					}
 					// If authentication is set then add service name/type
 					if (auth_set)
 					{
@@ -340,6 +345,11 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 					}
 					if (opRequest)
 					{
+						if (doc.HasMember("source") && doc["source"].IsString() &&
+							doc.HasMember("source_name") && doc["source_name"].IsString())
+						{
+							opRequest->addCaller(doc["source"].GetString(), doc["source_name"].GetString());
+						}
 						// If authentication is set then add service name/type
 						if (auth_set)
 						{
