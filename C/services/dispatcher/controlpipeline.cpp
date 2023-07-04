@@ -49,6 +49,7 @@ ControlPipeline::getExecutionContext(const PipelineEndpoint& source, const Pipel
 		if (!m_sharedContext)
 		{
 			m_sharedContext = new PipelineExecutionContext(m_manager->getManagementClient(), m_name, m_pipeline);
+			m_sharedContext->setPipelineManager(m_manager);
 		}
 		Logger::getLogger()->info("Using shared context for control pipeline '%s' from '%s' to '%s'",
 				m_name.c_str(), source.toString().c_str(), dest.toString().c_str());
@@ -68,6 +69,7 @@ ControlPipeline::getExecutionContext(const PipelineEndpoint& source, const Pipel
 	Logger::getLogger()->info("Create new context to run pipeline '%s' between '%s' and '%s'",
 			m_name.c_str(), source.toString().c_str(), dest.toString().c_str());
 	context = new PipelineExecutionContext(m_manager->getManagementClient(), m_name, m_pipeline);
+	context->setPipelineManager(m_manager);
 	ends.setContext(context);
 	m_contexts.push_back(ends);
 	return context;

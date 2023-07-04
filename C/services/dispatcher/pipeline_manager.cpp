@@ -11,6 +11,7 @@
 
 #include <pipeline_manager.h>
 #include <controlpipeline.h>
+#include <dispatcher_service.h>
 
 using namespace std;
 
@@ -341,4 +342,55 @@ ControlPipelineManager::EndpointLookup::EndpointLookup(const ControlPipelineMana
 	m_type = rhs.m_type;
 	m_name = rhs.m_name;
 	m_description = rhs.m_description;
+}
+
+/**
+ * Register a category name for a filter plugin. This allows the pipeline manager
+ * to reconfigure the filters inthe various pipelines when a category is changed.
+ *
+ * @param category	The name of the category to register
+ * @param plugin	The plugin that requires the category
+ */
+void ControlPipelineManager::registerCategory(const string& category, FilterPlugin *plugin)
+{
+	m_categories.insert(pair<string, FilterPlugin *>(category, plugin));
+	m_dispatcher->registerCategory(category);
+}
+
+/**
+ * Unregister a category name for a filter plugin. This removes the registration
+ * in order to prevent the plugin's reconfigure method being called when the category
+ * is changed. This should be called whenever a plugin is deleted.
+ *
+ * @param category	The name of the category to register
+ * @param plugin	The plugin that requires the category
+ */
+void ControlPipelineManager::unregisterCategory(const string& category, FilterPlugin *plugin)
+{
+	auto it = m_categories.find(category);
+	while (it != m_categories.end())
+	{
+		if (it->second == plugin)
+		{
+			m_categories.erase(it);
+			return;
+		}
+		it++;
+	}
+}
+
+/**
+ * A configuration category has changed. Fidn all the filter plugins that have registered
+ * an interest in the category and call the reconfigure method of the plugin.
+ *
+ * @param name		The name of the configuration category
+ * @param content	The content of the configuration category
+ */
+void ControlPipelineManager::categoryChanged(const string& name, const string& content)
+{
+	auto it = m_categories.find(name);
+	while (it != m_categories.end())
+	{
+		it->second->reconfigure(content);
+	}
 }

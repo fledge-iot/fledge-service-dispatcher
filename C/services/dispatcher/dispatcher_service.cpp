@@ -309,6 +309,7 @@ bool DispatcherService::start(string& coreAddress,
 
 		// Start the control filter pipeline manager
 		m_pipelineManager = new ControlPipelineManager(m_mgtClient, m_storage);
+		m_pipelineManager->setService(this);
 		m_pipelineManager->loadPipelines();
 
 		// .... wait until shutdown ...
@@ -436,8 +437,7 @@ void DispatcherService::configChange(const string& categoryName,
 			}
 		}
 	}
-
-	if (categoryName.compare(m_name + "Advanced") == 0)
+	else if (categoryName.compare(m_name + "Advanced") == 0)
 	{
 		ConfigCategory config(categoryName, category);
 		if (config.itemExists("logLevel"))
@@ -446,11 +446,15 @@ void DispatcherService::configChange(const string& categoryName,
 			m_logger->info("Setting log level to %s", config.getValue("logLevel").c_str());
 		}
 	}
-
-	// Update the  Security category
-	if (categoryName.compare(m_name+"Security") == 0)
+	else if (categoryName.compare(m_name+"Security") == 0)
 	{
+		// Update the  Security category
 		this->updateSecurityCategory(category);
+	}
+	else
+	{
+		// Probablt a fitler category, pass on to the pipeline_manager
+		m_pipelineManager->categoryChanged(categoryName, category);
 	}
 
 	return;

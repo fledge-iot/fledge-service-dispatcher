@@ -14,6 +14,7 @@
 #include <logger.h>
 #include <storage_client.h>
 #include <map>
+#include <filter_plugin.h>
 
 #define PIPELINES_TABLE		"control_pipelines"
 #define PIPELINES_FILTER_TABLE	"control_filters"
@@ -21,6 +22,7 @@
 #define DESTINATIONS_TABLE	"control_destination"
 
 class ControlPipeline;
+class DispatcherService;
 
 /**
  * Class to encapsulate the endpoint of a control pipeline
@@ -164,6 +166,11 @@ class ControlPipelineManager {
 					{
 						return m_managementClient;
 					}
+		void			setService(DispatcherService *service) { m_dispatcher = service; };
+
+		void			registerCategory(const std::string& category, FilterPlugin *plugin);
+		void			unregisterCategory(const std::string& category, FilterPlugin *plugin);
+		void			categoryChanged(const std::string& name, const std::string& content);
 	private:
 		void			loadLookupTables();
 		void			loadFilters(const std::string& pipeline, int cpid, std::vector<std::string>& filters);
@@ -190,6 +197,9 @@ class ControlPipelineManager {
 					m_sourceTypes;
 		std::map<int, ControlPipelineManager::EndpointLookup>
 					m_destTypes;
+		std::multimap<std::string, FilterPlugin *>
+					m_categories;
+		DispatcherService	*m_dispatcher;
 };
 
 #endif

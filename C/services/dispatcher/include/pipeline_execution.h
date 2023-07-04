@@ -20,6 +20,7 @@
 #include <filter_plugin.h>
 #include <mutex>
 
+class ControlPipelineManager;
 class FilterPlugin;
 class Reading;
 
@@ -34,6 +35,7 @@ class PipelineExecutionContext {
 	public:
 		PipelineExecutionContext(ManagementClient *management, const std::string& name, const std::vector<std::string>& filters);
 		~PipelineExecutionContext();
+		void				setPipelineManager(ControlPipelineManager *manager) { m_pipelineManager = manager; };
 
 		Reading				*filter(Reading *reading);
 
@@ -61,6 +63,7 @@ class PipelineExecutionContext {
 		std::vector<FilterPlugin *>	m_plugins;
 		READINGSET			*m_result;
 		std::mutex			m_mutex;
+		ControlPipelineManager		*m_pipelineManager;
 };
 
 #endif

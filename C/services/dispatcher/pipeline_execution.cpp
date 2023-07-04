@@ -9,6 +9,7 @@
  *
  */
 #include <pipeline_execution.h>
+#include <pipeline_manager.h>
 #include <plugin_manager.h>
 #include <filter_plugin.h>
 
@@ -135,6 +136,7 @@ bool rval = true;
 		{
 			plugin->init(updatedCfg, (OUTPUT_HANDLE *)this, filterReadingSetFn(useFilteredData));
 		}
+		m_pipelineManager->registerCategory(m_filters[i], plugin);
 	}
 
 	if (!rval)
