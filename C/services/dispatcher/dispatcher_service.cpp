@@ -591,3 +591,34 @@ bool DispatcherService::sendToService(const string& serviceName,
 		return false;
 	}
 }
+
+/**
+ * Register with the storage service for inserts, updates and deletes on the
+ * given table.
+ *
+ * @param table		The table to register
+ */
+void DispatcherService::registerTable(const string& table)
+{
+	vector<string> values;
+	unsigned short port = m_api->getListenerPort();
+	char buf[80];
+	snprintf(buf, sizeof(buf), "http://localhost:%d%s%s", port, TABLE_INSERT_URL, table.c_str());
+	m_storage->registerTableNotification(table, "", values, "insert", buf);
+	snprintf(buf, sizeof(buf), "http://localhost:%d%s%s", port, TABLE_DELETE_URL, table.c_str());
+        m_storage->registerTableNotification(table, "", values, "delete", buf);
+	snprintf(buf, sizeof(buf), "http://localhost:%d%s%s", port, TABLE_UPDATE_URL, table.c_str());
+        m_storage->registerTableNotification(table, "", values, "update", buf);
+}
+
+/**
+ * Forward any inserted rows to the pipeline manager
+ *
+ * @param table		The name of the table on which the insert has occurred
+ * @param doc		The row contents that has been inserted
+ */
+void DispatcherService::rowInsert(const string& table, const rapidjson::Document& doc)
+{
+	if (m_pipelineManager)
+		m_pipelineManager->rowInsert(table, doc);
+}

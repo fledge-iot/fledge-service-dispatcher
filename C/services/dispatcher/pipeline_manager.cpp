@@ -12,8 +12,10 @@
 #include <pipeline_manager.h>
 #include <controlpipeline.h>
 #include <dispatcher_service.h>
+#include <rapidjson/document.h>
 
 using namespace std;
+using namespace rapidjson;
 
 /**
  * Constructor for the Control Pipelien Manager
@@ -102,6 +104,10 @@ ControlPipelineManager::loadPipelines()
 	}
 
 	m_logger->debug("%d pipelines have benn loaded", m_pipelines.size());
+
+	// Register for updates to the table
+	m_dispatcher->registerTable(PIPELINES_TABLE);
+	m_dispatcher->registerTable(PIPELINES_FILTER_TABLE);
 	return;
 }
 
@@ -393,4 +399,90 @@ void ControlPipelineManager::categoryChanged(const string& name, const string& c
 	{
 		it->second->reconfigure(content);
 	}
+}
+
+/**
+ * Called whenever we get a row insert event from the storage service for
+ * one of the tables we are monitoring.
+ *
+ * @param table	The name of the table that the insert occurred on
+ * @param doc	Rapidjson document with the row contents
+ */
+void ControlPipelineManager::rowInsert(const string& table, const Document& doc)
+{
+	if (table.compare(PIPELINES_TABLE) == 0)
+	{
+		insertPipeline(doc);
+	}
+}
+
+/**
+ * Pipeline insert - handle an update to the pipelines table. This will be passed a
+ * JSON document with the new row in it.
+ *
+ * The document passed will look as follows
+ * {"name": "test3", "enabled": "t", "execution": "Exclusive", "stype": 2, "sname": "OpenOPCUA", "dtype": 4, "dname": ""}
+ *
+ * @param doc	The new pipeline table contents
+ */
+void ControlPipelineManager::insertPipeline(const Document& doc)
+{
+	// Check all ther fields values are present and correct
+	if (doc.HasMember("name") == false || doc["name"].IsString() == false)
+	{
+		return;
+	}
+	if (doc.HasMember("enabled") == false || doc["enabled"].IsString() == false)
+	{
+		return;
+	}
+	if (doc.HasMember("execution") == false || doc["execution"].IsString() == false)
+	{
+		return;
+	}
+	if (doc.HasMember("sname") == false || doc["sname"].IsString() == false)
+	{
+		return;
+	}
+	if (doc.HasMember("dname") == false || doc["dname"].IsString() == false)
+	{
+		return;
+	}
+	if (doc.HasMember("stype") == false || doc["stype"].IsInt() == false)
+	{
+		return;
+	}
+	if (doc.HasMember("dtype") == false || doc["dtype"].IsInt() == false)
+	{
+		return;
+	}
+
+	string pname = doc["name"].GetString();
+	ControlPipeline *pipe = new ControlPipeline(this, pname);
+	if (!pipe)
+	{
+		m_logger->error("Failed to allocate the '%s' control pipeline",
+								pname.c_str());
+	}
+	else
+	{
+		PipelineEndpoint::EndpointType stype = m_sourceTypes[doc["stype"].GetInt()].m_type;
+		PipelineEndpoint source(stype, doc["sname"].GetString());
+		PipelineEndpoint::EndpointType dtype = m_destTypes[doc["dtype"].GetInt()].m_type;
+		PipelineEndpoint dest(dtype, doc["dname"].GetString());
+		pipe->endpoints(source, dest);
+		// TODO add enabled and execution fields
+		m_pipelines[pname] = pipe;
+	}
+}
+
+/**
+ * Called when a new filter is inserted into a pipeline. The document
+ * passed contian sthe database row that was inserted.
+ *
+ * {"cpid": "3", "forder": 1, "fname": "ctrl_test3_exp1"}
+ * @param doc	The new filter table contents
+ */
+void ControlPipelineManager::insertPipelineFilter(const Document& doc)
+{
 }

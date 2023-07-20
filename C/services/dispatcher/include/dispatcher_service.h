@@ -21,6 +21,7 @@
 #include <condition_variable>
 #include <queue>
 #include <pipeline_manager.h>
+#include <rapidjson/document.h>
 
 #define SERVICE_NAME		"Fledge Dispatcher"
 #define SERVICE_TYPE		"Dispatcher"
@@ -66,6 +67,9 @@ class DispatcherService : public ServiceAuthHandler
 		 * Return the pipeline manager for the service.
 		 */
 		ControlPipelineManager	*getPipelineManager() { return m_pipelineManager; };
+
+		void			registerTable(const std::string& table);
+		void			rowInsert(const std::string& table, const rapidjson::Document& doc);
 
 	private:
 		ControlRequest		*getRequest();

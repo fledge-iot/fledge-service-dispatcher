@@ -171,8 +171,11 @@ class ControlPipelineManager {
 		void			registerCategory(const std::string& category, FilterPlugin *plugin);
 		void			unregisterCategory(const std::string& category, FilterPlugin *plugin);
 		void			categoryChanged(const std::string& name, const std::string& content);
+		void			rowInsert(const std::string& name, const rapidjson::Document& document);
 	private:
 		void			loadLookupTables();
+		void			insertPipeline(const rapidjson::Document& document);
+		void			insertPipelineFilter(const rapidjson::Document& document);
 		void			loadFilters(const std::string& pipeline, int cpid, std::vector<std::string>& filters);
 		PipelineEndpoint::EndpointType
 					findType(const std::string& typeName, bool source);
@@ -200,6 +203,8 @@ class ControlPipelineManager {
 		std::multimap<std::string, FilterPlugin *>
 					m_categories;
 		DispatcherService	*m_dispatcher;
+		std::map<int, std::string>
+					m_pipelineIds;
 };
 
 #endif
