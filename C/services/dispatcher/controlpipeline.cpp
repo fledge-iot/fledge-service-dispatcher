@@ -75,6 +75,37 @@ ControlPipeline::getExecutionContext(const PipelineEndpoint& source, const Pipel
 	return context;
 }
 
+/**
+ * Add a new filter into an exisitng pipeline
+ *
+ * @param filter	The name of the filter to add to the pipeline
+ * @param order		The location in the pipeline for the new filter
+ */
+void ControlPipeline::addFilter(const string& filter, int order)
+{
+	// Add the filter into the pipeline vector
+	auto it = m_pipeline.begin();
+	it += (order - 1);
+	m_pipeline.insert(it, filter);
+	// Update the contexts that exist for the pipeline
+	if (m_sharedContext)
+	{
+		m_sharedContext->addFilter(filter, order);
+	}
+	for (auto &ends : m_contexts)
+	{
+		ends.getContext()->addFilter(filter, order);
+	}
+}
+
+/**
+ * Remove the named filter from the pipeline
+ *
+ * @param filter	The name of the filter to remove
+ */
+void ControlPipeline::removeFilter(const string& filter)
+{
+}
 
 /*
  * Destructor for the pipeline execution context endpoints

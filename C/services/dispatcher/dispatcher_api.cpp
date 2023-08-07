@@ -419,7 +419,6 @@ void DispatcherApi::tableInsert(shared_ptr<HttpServer::Response> response,
 		if (result)
 		{
 			// Parse and action the table inserts
-			Logger::getLogger()->warn("FIXME: Table %s insert %s", table.c_str(), payload.c_str());
 			m_service->rowInsert(table, doc);
 		}
 		else
@@ -477,8 +476,8 @@ void DispatcherApi::tableUpdate(shared_ptr<HttpServer::Response> response,
 		ParseResult result = doc.Parse(payload.c_str());
 		if (result)
 		{
-			// Parse and action the table updates
 			Logger::getLogger()->warn("FIXME: Table %s update %s", table.c_str(), payload.c_str());
+			m_service->rowUpdate(table, doc);
 		}
 		else
 		{
@@ -535,8 +534,8 @@ void DispatcherApi::tableDelete(shared_ptr<HttpServer::Response> response,
 		ParseResult result = doc.Parse(payload.c_str());
 		if (result)
 		{
-			// Parse and action the table deletes
 			Logger::getLogger()->warn("FIXME: Table %s delete %s", table.c_str(), payload.c_str());
+			m_service->rowDelete(table, doc);
 		}
 		else
 		{

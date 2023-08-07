@@ -162,6 +162,8 @@ class ControlPipeline {
 		PipelineExecutionContext
 					*getExecutionContext(const PipelineEndpoint& source,
 							const PipelineEndpoint& dest);
+		void			addFilter(const std::string& filter, int order);
+		void			removeFilter(const std::string& filter);
 	private:
 		std::string		m_name;
 		bool			m_enable;

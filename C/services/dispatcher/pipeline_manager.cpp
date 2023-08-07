@@ -386,7 +386,7 @@ void ControlPipelineManager::unregisterCategory(const string& category, FilterPl
 }
 
 /**
- * A configuration category has changed. Fidn all the filter plugins that have registered
+ * A configuration category has changed. Find all the filter plugins that have registered
  * an interest in the category and call the reconfigure method of the plugin.
  *
  * @param name		The name of the configuration category
@@ -413,6 +413,48 @@ void ControlPipelineManager::rowInsert(const string& table, const Document& doc)
 	if (table.compare(PIPELINES_TABLE) == 0)
 	{
 		insertPipeline(doc);
+	}
+	else if (table.compare(PIPELINES_FILTER_TABLE) == 0)
+	{
+		insertPipelineFilter(doc);
+	}
+}
+
+/**
+ * Called whenever we get a row update event from the storage service for
+ * one of the tables we are monitoring.
+ *
+ * @param table	The name of the table that the update occurred on
+ * @param doc	Rapidjson document with the row contents
+ */
+void ControlPipelineManager::rowUpdate(const string& table, const Document& doc)
+{
+	if (table.compare(PIPELINES_TABLE) == 0)
+	{
+		updatePipeline(doc);
+	}
+	else if (table.compare(PIPELINES_FILTER_TABLE) == 0)
+	{
+		updatePipelineFilter(doc);
+	}
+}
+
+/**
+ * Called whenever we get a row delete event from the storage service for
+ * one of the tables we are monitoring.
+ *
+ * @param table	The name of the table that the delete occurred on
+ * @param doc	Rapidjson document with the row contents
+ */
+void ControlPipelineManager::rowDelete(const string& table, const Document& doc)
+{
+	if (table.compare(PIPELINES_TABLE) == 0)
+	{
+		deletePipeline(doc);
+	}
+	else if (table.compare(PIPELINES_FILTER_TABLE) == 0)
+	{
+		deletePipelineFilter(doc);
 	}
 }
 
@@ -478,11 +520,218 @@ void ControlPipelineManager::insertPipeline(const Document& doc)
 
 /**
  * Called when a new filter is inserted into a pipeline. The document
- * passed contian sthe database row that was inserted.
+ * passed contains the database row that was inserted.
  *
  * {"cpid": "3", "forder": 1, "fname": "ctrl_test3_exp1"}
  * @param doc	The new filter table contents
  */
 void ControlPipelineManager::insertPipelineFilter(const Document& doc)
 {
+	int id, order;
+	string filter;
+
+	if (doc.HasMember("cpid") && doc["cpid"].IsString())
+	{
+		string s = doc["cpid"].GetString();
+		id = strtol(s.c_str(), NULL, 10);
+	}
+	else
+	{
+		return;
+	}
+	if (doc.HasMember("forder") && doc["forder"].IsInt())
+	{
+		order = doc["forder"].GetInt();
+	}
+	else
+	{
+		return;
+	}
+	if (doc.HasMember("fname") && doc["fname"].IsString())
+	{
+		filter = doc["fname"].GetString();
+	}
+	else
+	{
+		return;
+	}
+
+	// Find the name of the pipeline
+	string name = m_pipelineIds[id];
+	if (name.empty())
+	{
+		m_logger->error("Unable to process addition of filter %s to pipeline as unable to find matching pipeline",
+				filter.c_str());
+		return;
+	}
+
+	ControlPipeline *pipeline = m_pipelines[name];
+	if (pipeline)
+	{
+		pipeline->addFilter(filter, order);
+	}
+	else
+	{
+		m_logger->error("Unable to process addition of filter %s to pipeline %s as unable to find matching pipeline",
+				filter.c_str(), name.c_str());
+	}
+}
+
+/**
+ * Pipeline update - handle an update to the pipelines table. This will be passed a
+ * JSON document with the new row in it.
+ *
+ * The document passed will look as follows
+ *
+ * @param doc	The new pipeline table contents
+ */
+void ControlPipelineManager::updatePipeline(const Document& doc)
+{
+	// TODO
+}
+
+/**
+ * Called when a new filter is inserted into a pipeline. The document
+ * passed contains the database row that was inserted.
+ *
+ * {"values": {"forder": 2}, "where": {"column": "fname", "condition": "=", "value": "ctrl_test1_rename", "and": {"column": "cpid", "condition": "=", "value": "1"}}}
+ * @param doc	The new filter table contents
+ */
+void ControlPipelineManager::updatePipelineFilter(const Document& doc)
+{
+	long cpid = -1;
+	// Find the ID of the fitler that is updated
+	if (doc.HasMember("where") && doc["where"].IsObject())
+	{
+		const Value& where = doc["where"];
+		if (where.HasMember("column") && where["column"].IsString()
+				&&strcmp(where["column"].GetString(), "cpid") == 0)
+		{
+			if (where.HasMember("value") && where["value"].IsString())
+			{
+				cpid = strtol(where["value"].GetString(), NULL, 10);
+			}
+		}
+		else if (where.HasMember("and") && where["and"].IsObject())
+		{
+			const Value& second = where["and"];
+			if (second.HasMember("value") && second["value"].IsString())
+			{
+				cpid = strtol(second["value"].GetString(), NULL, 10);
+			}
+		}
+	}
+	if (cpid == -1)
+	{
+		Logger::getLogger()->error("Unable to determine ID of updated pipeline, ignoring update");
+		return;
+	}
+
+	// We have the pipeline ID, not work out what has changed
+	if (doc.HasMember("values") && doc["values"].IsObject())
+	{
+		const Value& values = doc["values"];
+		for (auto& column : values.GetObject())
+		{
+			string name = column.name.GetString();
+			string vlaue = column.value.GetString();
+
+			if (name.compare("forder") == 0)
+			{
+				// A filter re-order
+				// TODO Action reorder
+			}
+		}
+
+	}
+}
+
+/**
+ * Pipeline delete - handle a delete to the pipelines table. This will be passed a
+ * JSON document with the new row in it.
+ *
+ * The document passed will look as follows
+ *
+ * @param doc	The deleted pipeline table contents
+ */
+void ControlPipelineManager::deletePipeline(const Document& doc)
+{
+	// TODO
+}
+
+/**
+ * Called when a new filter is inserted into a pipeline. The document
+ * passed contains the database row that was inserted.
+ *
+ * {"where": {"column": "cpid", "condition": "=", "value": "1", "and": {"column": "fname", "condition": "=", "value": "ctrl_test1_del"}}}
+ * @param doc	The new filter table contents
+ */
+void ControlPipelineManager::deletePipelineFilter(const Document& doc)
+{
+	long cpid = -1;
+	// Find the ID of the fitler that is updated
+	if (doc.HasMember("where") && doc["where"].IsObject())
+	{
+		const Value& where = doc["where"];
+		if (where.HasMember("column") && where["column"].IsString()
+				&&strcmp(where["column"].GetString(), "cpid") == 0)
+		{
+			if (where.HasMember("value") && where["value"].IsString())
+			{
+				cpid = strtol(where["value"].GetString(), NULL, 10);
+			}
+		}
+		else if (where.HasMember("and") && where["and"].IsObject())
+		{
+			const Value& second = where["and"];
+			if (second.HasMember("value") && second["value"].IsString())
+			{
+				cpid = strtol(second["value"].GetString(), NULL, 10);
+			}
+		}
+	}
+	if (cpid == -1)
+	{
+		Logger::getLogger()->error("Unable to determine ID of updated pipeline, ignoring update");
+		return;
+	}
+
+	// Now find the name of the filter to remove
+	string filter;
+	if (doc.HasMember("where") && doc["where"].IsObject())
+	{
+		const Value& where = doc["where"];
+		if (where.HasMember("column") && where["column"].IsString()
+				&&strcmp(where["column"].GetString(), "fname") == 0)
+		{
+			if (where.HasMember("value") && where["value"].IsString())
+			{
+				filter = where["value"].GetString();
+			}
+		}
+		else if (where.HasMember("and") && where["and"].IsObject())
+		{
+			const Value& second = where["and"];
+			if (second.HasMember("value") && second["value"].IsString())
+			{
+				filter = second["value"].GetString();
+			}
+		}
+	}
+	if (filter.empty())
+	{
+		Logger::getLogger()->error("Unable to determine the name of the filter to remove from the pipeline, no filters will be removed");
+		return;
+	}
+
+	string pipelineName = m_pipelineIds[cpid];
+	if (pipelineName.empty())
+	{
+		Logger::getLogger()->error("Unable to pipeline %d to remove filter from, ignoring", cpid);
+		return;
+	}
+	ControlPipeline *pipeline = m_pipelines[pipelineName];
+	if (!pipeline)
+		return;
+	pipeline->removeFilter(filter);
 }

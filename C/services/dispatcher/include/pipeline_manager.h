@@ -172,10 +172,16 @@ class ControlPipelineManager {
 		void			unregisterCategory(const std::string& category, FilterPlugin *plugin);
 		void			categoryChanged(const std::string& name, const std::string& content);
 		void			rowInsert(const std::string& name, const rapidjson::Document& document);
+		void			rowUpdate(const std::string& name, const rapidjson::Document& document);
+		void			rowDelete(const std::string& name, const rapidjson::Document& document);
 	private:
 		void			loadLookupTables();
 		void			insertPipeline(const rapidjson::Document& document);
 		void			insertPipelineFilter(const rapidjson::Document& document);
+		void			updatePipeline(const rapidjson::Document& document);
+		void			updatePipelineFilter(const rapidjson::Document& document);
+		void			deletePipeline(const rapidjson::Document& document);
+		void			deletePipelineFilter(const rapidjson::Document& document);
 		void			loadFilters(const std::string& pipeline, int cpid, std::vector<std::string>& filters);
 		PipelineEndpoint::EndpointType
 					findType(const std::string& typeName, bool source);

@@ -70,6 +70,8 @@ class DispatcherService : public ServiceAuthHandler
 
 		void			registerTable(const std::string& table);
 		void			rowInsert(const std::string& table, const rapidjson::Document& doc);
+		void			rowUpdate(const std::string& table, const rapidjson::Document& doc);
+		void			rowDelete(const std::string& table, const rapidjson::Document& doc);
 
 	private:
 		ControlRequest		*getRequest();

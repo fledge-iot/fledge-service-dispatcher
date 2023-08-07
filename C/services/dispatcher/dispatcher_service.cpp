@@ -622,3 +622,27 @@ void DispatcherService::rowInsert(const string& table, const rapidjson::Document
 	if (m_pipelineManager)
 		m_pipelineManager->rowInsert(table, doc);
 }
+
+/**
+ * Forward any updated rows to the pipeline manager
+ *
+ * @param table		The name of the table on which the update has occurred
+ * @param doc		The row contents that has been updated
+ */
+void DispatcherService::rowUpdate(const string& table, const rapidjson::Document& doc)
+{
+	if (m_pipelineManager)
+		m_pipelineManager->rowUpdate(table, doc);
+}
+
+/**
+ * Forward any deleted rows to the pipeline manager
+ *
+ * @param table		The name of the table on which the delete has occurred
+ * @param doc		The row contents that has been deleted
+ */
+void DispatcherService::rowDelete(const string& table, const rapidjson::Document& doc)
+{
+	if (m_pipelineManager)
+		m_pipelineManager->rowDelete(table, doc);
+}
