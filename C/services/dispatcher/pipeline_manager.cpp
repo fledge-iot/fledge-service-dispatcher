@@ -65,6 +65,7 @@ ControlPipelineManager::loadPipelines()
 				if (row)
 				{
 					ResultSet::ColumnValue *cpid = row->getColumn("cpid");
+					long pipelineId = cpid->getInteger();
 					ResultSet::ColumnValue *name = row->getColumn("name");
 					string pname = name->getString();
 
@@ -89,6 +90,7 @@ ControlPipelineManager::loadPipelines()
 					loadFilters(pname, cpid->getInteger(), filters);
 					pipe->setPipeline(filters);
 					m_pipelines[pname] = pipe;
+					m_pipelineIds[pipelineId] = pname;
 				}
 				if (! pipelines->isLastRow(it))
 					it++;
@@ -583,11 +585,47 @@ void ControlPipelineManager::insertPipelineFilter(const Document& doc)
  *
  * The document passed will look as follows
  *
+ * {"values": {"enabled": "t", "execution": "Shared", "stype": 1, "sname": "", "dtype": 4, "dname": ""}, "where": {"column": "cpid", "condition": "=", "value": "1"}}
+
  * @param doc	The new pipeline table contents
  */
 void ControlPipelineManager::updatePipeline(const Document& doc)
 {
-	// TODO
+	string value = getFromJSONWhere(doc, "cpid");
+	if (value.empty())
+	{
+		m_logger->error("Unable to determine ID of updated pipeline, ignoring update");
+		return;
+	}
+	long cpid = strtol(value.c_str(), NULL, 10);
+
+	string pipelineName = m_pipelineIds[cpid];
+	if (pipelineName.empty())
+	{
+		m_logger->error("Unable to determine name of updated pipeline %d, ignoring update", cpid);
+		return;
+	}
+
+	ControlPipeline *pipeline = m_pipelines[pipelineName];
+	if (doc.HasMember("values") && doc["values"].IsObject())
+	{
+		const Value& values = doc["values"];
+		for (auto& column : values.GetObject())
+		{
+			string name = column.name.GetString();
+			if (name.compare("enabled") == 0)
+			{
+				string value = column.value.GetString();
+				pipeline->enable(value.compare("t") == 0 ? true : false);
+			}
+			else if (name.compare("execution") == 0)
+			{
+				string value = column.value.GetString();
+				pipeline->exclusive(value.compare("Shared") == 0 ? false : true);
+			}
+			// TODO action the endpoint changes
+		}
+	}
 }
 
 /**
@@ -599,33 +637,13 @@ void ControlPipelineManager::updatePipeline(const Document& doc)
  */
 void ControlPipelineManager::updatePipelineFilter(const Document& doc)
 {
-	long cpid = -1;
-	// Find the ID of the fitler that is updated
-	if (doc.HasMember("where") && doc["where"].IsObject())
+	string value = getFromJSONWhere(doc, "cpid");
+	if (value.empty())
 	{
-		const Value& where = doc["where"];
-		if (where.HasMember("column") && where["column"].IsString()
-				&&strcmp(where["column"].GetString(), "cpid") == 0)
-		{
-			if (where.HasMember("value") && where["value"].IsString())
-			{
-				cpid = strtol(where["value"].GetString(), NULL, 10);
-			}
-		}
-		else if (where.HasMember("and") && where["and"].IsObject())
-		{
-			const Value& second = where["and"];
-			if (second.HasMember("value") && second["value"].IsString())
-			{
-				cpid = strtol(second["value"].GetString(), NULL, 10);
-			}
-		}
-	}
-	if (cpid == -1)
-	{
-		Logger::getLogger()->error("Unable to determine ID of updated pipeline, ignoring update");
+		m_logger->error("Unable to determine ID of updated pipeline, ignoring update");
 		return;
 	}
+	long cpid = strtol(value.c_str(), NULL, 10);
 
 	// We have the pipeline ID, not work out what has changed
 	if (doc.HasMember("values") && doc["values"].IsObject())
@@ -634,12 +652,19 @@ void ControlPipelineManager::updatePipelineFilter(const Document& doc)
 		for (auto& column : values.GetObject())
 		{
 			string name = column.name.GetString();
-			string vlaue = column.value.GetString();
 
 			if (name.compare("forder") == 0)
 			{
-				// A filter re-order
-				// TODO Action reorder
+				if (!column.value.IsInt())
+				{
+					m_logger->error("The order in the pipeline is expected to be an integer but is not, ignoring reorder");
+				}
+				else
+				{
+					int ord = column.value.GetInt();
+					// A filter re-order
+					// TODO Action reorder
+				}
 			}
 		}
 
@@ -651,12 +676,23 @@ void ControlPipelineManager::updatePipelineFilter(const Document& doc)
  * JSON document with the new row in it.
  *
  * The document passed will look as follows
+ * {"where": {"column": "cpid", "condition": "=", "value": 4}}
  *
  * @param doc	The deleted pipeline table contents
  */
 void ControlPipelineManager::deletePipeline(const Document& doc)
 {
-	// TODO
+	string value = getFromJSONWhere(doc, "cpid");
+	if (value.empty())
+	{
+		m_logger->error("Unable to determine ID of pipeline to delete, ignoring delete");
+		return;
+	}
+	long cpid = strtol(value.c_str(), NULL, 10);
+	string pipelineName = m_pipelineIds[cpid];
+	m_pipelineIds.erase(cpid);
+	ControlPipeline *pipeline = m_pipelines[pipelineName];
+	m_pipelines.erase(pipelineName);
 }
 
 /**
@@ -668,70 +704,69 @@ void ControlPipelineManager::deletePipeline(const Document& doc)
  */
 void ControlPipelineManager::deletePipelineFilter(const Document& doc)
 {
-	long cpid = -1;
-	// Find the ID of the fitler that is updated
-	if (doc.HasMember("where") && doc["where"].IsObject())
+	string value = getFromJSONWhere(doc, "cpid");
+	if (value.empty())
 	{
-		const Value& where = doc["where"];
-		if (where.HasMember("column") && where["column"].IsString()
-				&&strcmp(where["column"].GetString(), "cpid") == 0)
-		{
-			if (where.HasMember("value") && where["value"].IsString())
-			{
-				cpid = strtol(where["value"].GetString(), NULL, 10);
-			}
-		}
-		else if (where.HasMember("and") && where["and"].IsObject())
-		{
-			const Value& second = where["and"];
-			if (second.HasMember("value") && second["value"].IsString())
-			{
-				cpid = strtol(second["value"].GetString(), NULL, 10);
-			}
-		}
-	}
-	if (cpid == -1)
-	{
-		Logger::getLogger()->error("Unable to determine ID of updated pipeline, ignoring update");
+		m_logger->error("Unable to determine ID of updated pipeline, ignoring update");
 		return;
 	}
+	long cpid = strtol(value.c_str(), NULL, 10);
 
 	// Now find the name of the filter to remove
-	string filter;
-	if (doc.HasMember("where") && doc["where"].IsObject())
-	{
-		const Value& where = doc["where"];
-		if (where.HasMember("column") && where["column"].IsString()
-				&&strcmp(where["column"].GetString(), "fname") == 0)
-		{
-			if (where.HasMember("value") && where["value"].IsString())
-			{
-				filter = where["value"].GetString();
-			}
-		}
-		else if (where.HasMember("and") && where["and"].IsObject())
-		{
-			const Value& second = where["and"];
-			if (second.HasMember("value") && second["value"].IsString())
-			{
-				filter = second["value"].GetString();
-			}
-		}
-	}
+	string filter = getFromJSONWhere(doc, "fname");;
 	if (filter.empty())
 	{
-		Logger::getLogger()->error("Unable to determine the name of the filter to remove from the pipeline, no filters will be removed");
+		m_logger->error("Unable to determine the name of the filter to remove from the pipeline, no filters will be removed");
 		return;
 	}
 
 	string pipelineName = m_pipelineIds[cpid];
 	if (pipelineName.empty())
 	{
-		Logger::getLogger()->error("Unable to pipeline %d to remove filter from, ignoring", cpid);
+		m_logger->error("Unable to pipeline %d to remove filter from, ignoring", cpid);
 		return;
 	}
 	ControlPipeline *pipeline = m_pipelines[pipelineName];
 	if (!pipeline)
 		return;
 	pipeline->removeFilter(filter);
+}
+
+/**
+ * Extract a given ID from a JSON where clause that is part of a database
+ * table change notification
+ *
+ * @param doc	The JSON document containing the where clause
+ * @param key	The key to extract
+ * @return string	The key value
+ */
+string ControlPipelineManager::getFromJSONWhere(const Document& doc, const string& key)
+{
+	string result;
+	// Find the key in the where clause
+	if (doc.HasMember("where") && doc["where"].IsObject())
+	{
+		const Value& where = doc["where"];
+		if (where.HasMember("column") && where["column"].IsString()
+				&& key.compare(where["column"].GetString()) == 0)
+		{
+			if (where.HasMember("value") && where["value"].IsString())
+			{
+				result = where["value"].GetString();
+			}
+		}
+		else if (where.HasMember("and") && where["and"].IsObject())
+		{
+			const Value& second = where["and"];
+			if (second.HasMember("column") && second["column"].IsString()
+					&& key.compare(second["column"].GetString()) == 0)
+			{
+				if (second.HasMember("value") && second["value"].IsString())
+				{
+					result = second["value"].GetString();
+				}
+			}
+		}
+	}
+	return result;
 }

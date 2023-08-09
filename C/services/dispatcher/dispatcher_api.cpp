@@ -523,6 +523,7 @@ void DispatcherApi::tableDelete(shared_ptr<HttpServer::Response> response,
 								callerName,
 								callerType))
 		{
+			Logger::getLogger()->warn("FIXME: failed delete %s", payload.c_str());
 			return;
 		}
 	}

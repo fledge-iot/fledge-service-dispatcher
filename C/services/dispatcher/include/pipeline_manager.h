@@ -185,6 +185,7 @@ class ControlPipelineManager {
 		void			loadFilters(const std::string& pipeline, int cpid, std::vector<std::string>& filters);
 		PipelineEndpoint::EndpointType
 					findType(const std::string& typeName, bool source);
+		std::string		getFromJSONWhere(const rapidjson::Document& document, const std::string& key);
 	public:
 		class EndpointLookup {
 			public:
