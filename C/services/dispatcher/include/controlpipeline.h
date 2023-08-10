@@ -18,7 +18,7 @@ class PipelineExecutionContext;
 
 /**
  * A class that encapsulates the source and destination endpoints of
- * a control pipeline with its execution contenxt
+ * a control pipeline with its execution context
  */
 class ContextEndpoints {
 	public:
@@ -164,6 +164,9 @@ class ControlPipeline {
 							const PipelineEndpoint& dest);
 		void			addFilter(const std::string& filter, int order);
 		void			removeFilter(const std::string& filter);
+		void			reorder(const std::string& filter, int order);
+	private:
+		void			removeAllContexts();
 	private:
 		std::string		m_name;
 		bool			m_enable;
@@ -177,6 +180,7 @@ class ControlPipeline {
 		std::vector<ContextEndpoints>
 					m_contexts;
 		ControlPipelineManager	*m_manager;
+		std::mutex		m_contextMutex;
 };
 
 #endif

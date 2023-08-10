@@ -644,6 +644,19 @@ void ControlPipelineManager::updatePipelineFilter(const Document& doc)
 		return;
 	}
 	long cpid = strtol(value.c_str(), NULL, 10);
+	string filter = getFromJSONWhere(doc, "fname");
+	if (filter.empty())
+	{
+		m_logger->error("Unable to determine the name of the filter to reorder");
+		return;
+	}
+	string name = m_pipelineIds[cpid];
+	ControlPipeline *pipeline = m_pipelines[name];
+	if (!pipeline)
+	{
+		m_logger->error("Pipeline %s has not been loaded, update ignored", name.c_str());
+		return;
+	}
 
 	// We have the pipeline ID, not work out what has changed
 	if (doc.HasMember("values") && doc["values"].IsObject())
@@ -663,7 +676,7 @@ void ControlPipelineManager::updatePipelineFilter(const Document& doc)
 				{
 					int ord = column.value.GetInt();
 					// A filter re-order
-					// TODO Action reorder
+					pipeline->reorder(filter, ord);
 				}
 			}
 		}

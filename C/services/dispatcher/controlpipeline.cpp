@@ -11,6 +11,7 @@
 #include <controlpipeline.h>
 #include <pipeline_manager.h>
 #include <pipeline_execution.h>
+#include <algorithm>
 
 using namespace std;
 
@@ -44,6 +45,7 @@ ControlPipeline::~ControlPipeline()
 PipelineExecutionContext *
 ControlPipeline::getExecutionContext(const PipelineEndpoint& source, const PipelineEndpoint& dest)
 {
+	lock_guard<mutex> guard(m_contextMutex);	// Stop the context beign handed out
 	if (!m_exclusive)
 	{
 		if (!m_sharedContext)
@@ -88,6 +90,7 @@ void ControlPipeline::addFilter(const string& filter, int order)
 	it += (order - 1);
 	m_pipeline.insert(it, filter);
 	// Update the contexts that exist for the pipeline
+	lock_guard<mutex> guard(m_contextMutex);	// Stop the context being handed out
 	if (m_sharedContext)
 	{
 		m_sharedContext->addFilter(filter, order);
@@ -105,6 +108,59 @@ void ControlPipeline::addFilter(const string& filter, int order)
  */
 void ControlPipeline::removeFilter(const string& filter)
 {
+	// TODO Implement
+	// until this is done simply remove all the active contexts
+	removeAllContexts();
+}
+
+/**
+ * Reorder the named filter within the pipeline
+ *
+ * @param filter	The name of the filter to reorder
+ * @param order		The required position in the pipeline
+ */
+void ControlPipeline::reorder(const string& filter, int order)
+{
+	if (m_pipeline[order].compare(filter) == 0)
+	{
+		// Already in the correct location. This can happen
+		// as when two filters move position we get an update
+		// for both but the first update will correct the second
+		// filter as well
+		return;
+	}
+
+	// An update is required
+	auto pos = m_pipeline.begin();
+	while (pos != m_pipeline.end())
+	{
+		if (pos->compare(filter) == 0)
+			break;
+		pos++;
+	}
+	if (pos == m_pipeline.end())
+	{
+		Logger::getLogger()->error("Failed to find filter %s in pipeline %s to re-order",
+				filter.c_str(), m_name.c_str());
+		return;
+	}
+	auto itr = m_pipeline.begin();
+	iter_swap(pos, itr + order);
+
+	// TODO Re-order the pipelines in all the contexts
+	// until this is done simply remove all the active contexts
+	removeAllContexts();
+}
+
+/**
+ * Remove all the contexts that exist for this pipeline
+ */
+void ControlPipeline::removeAllContexts()
+{
+	lock_guard<mutex> guard(m_contextMutex);
+	delete m_sharedContext;
+	m_sharedContext = NULL;
+	m_contexts.clear();
 }
 
 /*

@@ -196,7 +196,7 @@ int	size;
 	// get void*'s for all entries on the stack
 	size = backtrace(array, 20);
 
-	// print out all the frames to stderr
+	// Log all the stack frames
 	logger->fatal("Signal %d (%s) trapped:\n", sig, strsignal(sig));
 	char **messages = backtrace_symbols(array, size);
 	for (int i = 0; i < size; i++)

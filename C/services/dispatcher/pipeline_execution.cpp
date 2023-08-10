@@ -32,9 +32,23 @@ PipelineExecutionContext::PipelineExecutionContext(ManagementClient *management,
  * Destructor for the Pipeline Execution Context.
  *
  * Shutdown the filters and reclaim any resources
+ *
+ * Destruction requires that there are no control operations currently using
+ * the context. We need to wait until we can grab the mutex before proceeding,
+ * however this is not suffcient as if there are any other threads waiting on
+ * the mutex they will grab this after we have destroyed the context and hence
+ * fail. The layer above us, the pipeline manager takes responbsibility for this.
  */
 PipelineExecutionContext::~PipelineExecutionContext()
 {
+	lock_guard<mutex> guard(m_mutex);
+
+	for (int i = 0; i < m_plugins.size(); i++)
+	{
+		m_plugins[i]->shutdown();
+		delete m_plugins[i];
+	}
+
 }
 
 /**
@@ -62,7 +76,7 @@ bool rval = true;
 				if (!filterHandle)
 				{
 					string errMsg("Cannot load filter plugin '" + filterName + "'");
-					Logger::getLogger()->error(errMsg.c_str());
+					m_logger->error(errMsg.c_str());
 					rval = false;
 				}
 				else
@@ -81,7 +95,7 @@ bool rval = true;
 					{
 						string errMsg("Cannot create/update '" + \
 							      categoryName + "' filter category");
-						Logger::getLogger()->fatal(errMsg.c_str());
+						m_logger->error(errMsg.c_str());
 						rval = false;
 					}
 					else
@@ -104,18 +118,18 @@ bool rval = true;
 	catch (ConfigItemNotFound* e)
 	{
 		delete e;
-		Logger::getLogger()->info("loadFilters: no filters configured for pipeline %s", m_name.c_str());
+		m_logger->info("loadFilters: no filters configured for pipeline %s", m_name.c_str());
 		return true;
 	}
 	catch (exception& e)
 	{
-		Logger::getLogger()->fatal("loadFilters: failed to handle exception for pipeline %s, %s",
+		m_logger->error("loadFilters: failed to handle exception for pipeline %s, %s",
 				m_name.c_str(), e.what());
 		return false;
 	}
 	catch (...)
 	{
-		Logger::getLogger()->fatal("loadFilters: generic exception while loading %s", m_name.c_str());
+		m_logger->error("loadFilters: generic exception while loading %s", m_name.c_str());
 		return false;
 	}
 
@@ -157,19 +171,19 @@ PipelineExecutionContext::loadFilterPlugin(const string& filterName)
 {
 	if (filterName.empty())
 	{
-		Logger::getLogger()->error("Unable to fetch filter plugin '%s' .",
+		m_logger->error("Unable to fetch filter plugin '%s' .",
 			filterName.c_str());
 		// Failure
 		return NULL;
 	}
-	Logger::getLogger()->debug("Loading filter plugin '%s'.", filterName.c_str());
+	m_logger->debug("Loading filter plugin '%s'.", filterName.c_str());
 
 	PluginManager* manager = PluginManager::getInstance();
 	PLUGIN_HANDLE handle;
 	if ((handle = manager->loadPlugin(filterName, PLUGIN_TYPE_FILTER)) != NULL)
 	{
 		// Suceess
-		Logger::getLogger()->info("Loaded filter plugin '%s'.", filterName.c_str());
+		m_logger->info("Loaded filter plugin '%s'.", filterName.c_str());
 	}
 	return handle;
 }
@@ -304,7 +318,7 @@ void PipelineExecutionContext::addFilter(const string& filter, int order)
 		if (!filterHandle)
 		{
 			string errMsg("Cannot load filter plugin '" + filterName + "'");
-			Logger::getLogger()->error(errMsg.c_str());
+			m_logger->error(errMsg.c_str());
 			return;
 		}
 		else
@@ -323,7 +337,7 @@ void PipelineExecutionContext::addFilter(const string& filter, int order)
 			{
 				string errMsg("Cannot create/update '" + \
 					      filter + "' filter category");
-				Logger::getLogger()->fatal(errMsg.c_str());
+				m_logger->error(errMsg.c_str());
 				return;
 			}
 			else

@@ -476,7 +476,6 @@ void DispatcherApi::tableUpdate(shared_ptr<HttpServer::Response> response,
 		ParseResult result = doc.Parse(payload.c_str());
 		if (result)
 		{
-			Logger::getLogger()->warn("FIXME: Table %s update %s", table.c_str(), payload.c_str());
 			m_service->rowUpdate(table, doc);
 		}
 		else
@@ -523,7 +522,6 @@ void DispatcherApi::tableDelete(shared_ptr<HttpServer::Response> response,
 								callerName,
 								callerType))
 		{
-			Logger::getLogger()->warn("FIXME: failed delete %s", payload.c_str());
 			return;
 		}
 	}
@@ -535,7 +533,6 @@ void DispatcherApi::tableDelete(shared_ptr<HttpServer::Response> response,
 		ParseResult result = doc.Parse(payload.c_str());
 		if (result)
 		{
-			Logger::getLogger()->warn("FIXME: Table %s delete %s", table.c_str(), payload.c_str());
 			m_service->rowDelete(table, doc);
 		}
 		else
