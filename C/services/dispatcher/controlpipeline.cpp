@@ -23,6 +23,7 @@ using namespace std;
 ControlPipeline::ControlPipeline(ControlPipelineManager *manager, const string& name) : m_name(name),
 	m_enable(true), m_exclusive(false), m_sharedContext(NULL), m_manager(manager)
 {
+	m_logger = Logger::getLogger();
 }
 
 /**
@@ -53,7 +54,7 @@ ControlPipeline::getExecutionContext(const PipelineEndpoint& source, const Pipel
 			m_sharedContext = new PipelineExecutionContext(m_manager->getManagementClient(), m_name, m_pipeline);
 			m_sharedContext->setPipelineManager(m_manager);
 		}
-		Logger::getLogger()->info("Using shared context for control pipeline '%s' from '%s' to '%s'",
+		m_logger->info("Using shared context for control pipeline '%s' from '%s' to '%s'",
 				m_name.c_str(), source.toString().c_str(), dest.toString().c_str());
 		return m_sharedContext;
 	}
@@ -68,7 +69,7 @@ ControlPipeline::getExecutionContext(const PipelineEndpoint& source, const Pipel
 			return it.getContext();
 		}
 	}
-	Logger::getLogger()->info("Create new context to run pipeline '%s' between '%s' and '%s'",
+	m_logger->info("Create new context to run pipeline '%s' between '%s' and '%s'",
 			m_name.c_str(), source.toString().c_str(), dest.toString().c_str());
 	context = new PipelineExecutionContext(m_manager->getManagementClient(), m_name, m_pipeline);
 	context->setPipelineManager(m_manager);
@@ -121,7 +122,8 @@ void ControlPipeline::removeFilter(const string& filter)
  */
 void ControlPipeline::reorder(const string& filter, int order)
 {
-	if (m_pipeline[order].compare(filter) == 0)
+	m_logger->fatal("FIXME: reorder(%s, %d)", filter.c_str(), order);
+	if (m_pipeline[order - 1].compare(filter) == 0)
 	{
 		// Already in the correct location. This can happen
 		// as when two filters move position we get an update
@@ -131,25 +133,23 @@ void ControlPipeline::reorder(const string& filter, int order)
 	}
 
 	// An update is required
-	auto pos = m_pipeline.begin();
-	while (pos != m_pipeline.end())
+	for (int currentPosition = 0; currentPosition < m_pipeline.size(); currentPosition++)
 	{
-		if (pos->compare(filter) == 0)
-			break;
-		pos++;
-	}
-	if (pos == m_pipeline.end())
-	{
-		Logger::getLogger()->error("Failed to find filter %s in pipeline %s to re-order",
-				filter.c_str(), m_name.c_str());
-		return;
-	}
-	auto itr = m_pipeline.begin();
-	iter_swap(pos, itr + order);
+		if (m_pipeline[currentPosition].compare(filter) == 0)
+		{
+			m_pipeline[currentPosition] = m_pipeline[order - 1];
+			m_pipeline[order - 1] = filter;
+			m_logger->fatal("FIXME: Remove contexts");
 
-	// TODO Re-order the pipelines in all the contexts
-	// until this is done simply remove all the active contexts
-	removeAllContexts();
+			// TODO Re-order the pipelines in all the contexts
+			// until this is done simply remove all the active contexts
+			removeAllContexts();
+			return;
+		}
+		m_logger->fatal("FIXME: got %s looking for %s", m_pipeline[currentPosition].c_str(), filter.c_str());
+	}
+	m_logger->error("Failed to find filter %s in pipeline %s to re-order",
+				filter.c_str(), m_name.c_str());
 }
 
 /**
@@ -158,7 +158,10 @@ void ControlPipeline::reorder(const string& filter, int order)
 void ControlPipeline::removeAllContexts()
 {
 	lock_guard<mutex> guard(m_contextMutex);
-	delete m_sharedContext;
+	if (m_sharedContext)
+	{
+		delete m_sharedContext;
+	}
 	m_sharedContext = NULL;
 	m_contexts.clear();
 }

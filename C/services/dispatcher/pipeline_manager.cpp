@@ -138,7 +138,7 @@ void ControlPipelineManager::loadFilters(const string& pipeline, int cpid, vecto
 				ResultSet::ColumnValue *name = row->getColumn("fname");
 				filters.emplace_back(name->getString());
 			}
-		} while (results->isLastRow(it++));
+		} while (! results->isLastRow(it++));
 		delete results;
 	} catch (exception* exp) {
 		m_logger->error("Exception loading control pipeline filters for pipeline %s: %s", pipeline.c_str(), exp->what());

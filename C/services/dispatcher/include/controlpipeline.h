@@ -181,6 +181,7 @@ class ControlPipeline {
 					m_contexts;
 		ControlPipelineManager	*m_manager;
 		std::mutex		m_contextMutex;
+		Logger			*m_logger;
 };
 
 #endif
