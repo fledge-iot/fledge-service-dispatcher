@@ -122,7 +122,6 @@ void ControlPipeline::removeFilter(const string& filter)
  */
 void ControlPipeline::reorder(const string& filter, int order)
 {
-	m_logger->fatal("FIXME: reorder(%s, %d)", filter.c_str(), order);
 	if (m_pipeline[order - 1].compare(filter) == 0)
 	{
 		// Already in the correct location. This can happen
@@ -139,14 +138,12 @@ void ControlPipeline::reorder(const string& filter, int order)
 		{
 			m_pipeline[currentPosition] = m_pipeline[order - 1];
 			m_pipeline[order - 1] = filter;
-			m_logger->fatal("FIXME: Remove contexts");
 
 			// TODO Re-order the pipelines in all the contexts
 			// until this is done simply remove all the active contexts
 			removeAllContexts();
 			return;
 		}
-		m_logger->fatal("FIXME: got %s looking for %s", m_pipeline[currentPosition].c_str(), filter.c_str());
 	}
 	m_logger->error("Failed to find filter %s in pipeline %s to re-order",
 				filter.c_str(), m_name.c_str());
