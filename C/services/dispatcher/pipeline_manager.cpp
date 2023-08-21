@@ -130,15 +130,17 @@ void ControlPipelineManager::loadFilters(const string& pipeline, int cpid, vecto
 	allFilters.sort(orderby);
 	try {
 		ResultSet *results = m_storage->queryTable(PIPELINES_FILTER_TABLE, allFilters);
-		ResultSet::RowIterator it = results->firstRow();
-		do {
-			ResultSet::Row *row = *it;
-			if (row)
-			{
-				ResultSet::ColumnValue *name = row->getColumn("fname");
-				filters.emplace_back(name->getString());
-			}
-		} while (! results->isLastRow(it++));
+		if (results->rowCount() > 0) {
+			ResultSet::RowIterator it = results->firstRow();
+			do {
+				ResultSet::Row *row = *it;
+				if (row)
+				{
+					ResultSet::ColumnValue *name = row->getColumn("fname");
+					filters.emplace_back(name->getString());
+				}
+			} while (! results->isLastRow(it++));
+		}
 		delete results;
 	} catch (exception* exp) {
 		m_logger->error("Exception loading control pipeline filters for pipeline %s: %s", pipeline.c_str(), exp->what());
