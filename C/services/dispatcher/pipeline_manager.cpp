@@ -517,7 +517,24 @@ void ControlPipelineManager::insertPipeline(const Document& doc)
 		PipelineEndpoint::EndpointType dtype = m_destTypes[doc["dtype"].GetInt()].m_type;
 		PipelineEndpoint dest(dtype, doc["dname"].GetString());
 		pipe->endpoints(source, dest);
-		// TODO add enabled and execution fields
+		string en doc["enabled"].GetString();
+		if (en.compare("t") == 0)
+		{
+			pipe->enable(true);
+		}
+		else
+		{
+			pipe->enable(false);
+		}
+		string ex doc["execution"].GetString();
+		if (ex.compare("Exclusive") == 0)
+		{
+			pipe->exclusive(true);
+		}
+		else
+		{
+			pipe->exclusive(false);
+		}
 		m_pipelines[pname] = pipe;
 	}
 }

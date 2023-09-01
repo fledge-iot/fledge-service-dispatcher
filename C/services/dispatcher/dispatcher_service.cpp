@@ -453,7 +453,7 @@ void DispatcherService::configChange(const string& categoryName,
 	}
 	else
 	{
-		// Probablt a fitler category, pass on to the pipeline_manager
+		// Probably a fitler category, pass on to the pipeline_manager
 		m_pipelineManager->categoryChanged(categoryName, category);
 	}
 

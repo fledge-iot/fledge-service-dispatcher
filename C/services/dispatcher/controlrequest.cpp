@@ -277,4 +277,5 @@ void ControlOperationRequest::filter(ControlPipelineManager *manager)
 		// Nothing to do
 		return;
 	}
+	// TODO Do the actual filtering
 }
