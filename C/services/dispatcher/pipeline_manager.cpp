@@ -85,7 +85,6 @@ ControlPipelineManager::loadPipelines()
 					ResultSet::ColumnValue *dname = row->getColumn("dname");
 					PipelineEndpoint dest(dtype, dname->getString());
 					pipe->endpoints(source, dest);
-					// TODO add enabled and execution fields
 					vector<string> filters;
 					loadFilters(pname, cpid->getInteger(), filters);
 					pipe->setPipeline(filters);
@@ -517,7 +516,7 @@ void ControlPipelineManager::insertPipeline(const Document& doc)
 		PipelineEndpoint::EndpointType dtype = m_destTypes[doc["dtype"].GetInt()].m_type;
 		PipelineEndpoint dest(dtype, doc["dname"].GetString());
 		pipe->endpoints(source, dest);
-		string en doc["enabled"].GetString();
+		string en = doc["enabled"].GetString();
 		if (en.compare("t") == 0)
 		{
 			pipe->enable(true);
@@ -526,7 +525,7 @@ void ControlPipelineManager::insertPipeline(const Document& doc)
 		{
 			pipe->enable(false);
 		}
-		string ex doc["execution"].GetString();
+		string ex = doc["execution"].GetString();
 		if (ex.compare("Exclusive") == 0)
 		{
 			pipe->exclusive(true);
@@ -632,12 +631,12 @@ void ControlPipelineManager::updatePipeline(const Document& doc)
 		for (auto& column : values.GetObject())
 		{
 			string name = column.name.GetString();
-			if (name.compare("enabled") == 0)
+			if (name.compare("enabled") == 0 && column.value.IsString())
 			{
 				string value = column.value.GetString();
 				pipeline->enable(value.compare("t") == 0 ? true : false);
 			}
-			else if (name.compare("execution") == 0)
+			else if (name.compare("execution") == 0 && column.value.IsString())
 			{
 				string value = column.value.GetString();
 				pipeline->exclusive(value.compare("Shared") == 0 ? false : true);
