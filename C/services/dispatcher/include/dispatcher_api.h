@@ -22,6 +22,15 @@ using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
 #define	DISPATCH_WRITE			"/dispatch/write"
 #define DISPATCH_OPERATION		"/dispatch/operation"
 
+/*
+ * URL's for monitor pipeline definitions
+ */
+#define TABLE_INSERT_URL		"/dispatch/table/insert/"
+#define TABLE_DELETE_URL		"/dispatch/table/delete/"
+#define TABLE_UPDATE_URL		"/dispatch/table/update/"
+
+#define TABLE_PATTERN			"([A-Za-z][A-Za-z0-9_]*)$"
+
 #define ESCAPE_SPECIAL_CHARS		"\\{\\}\\\"\\(\\)\\!\\[\\]\\^\\$\\.\\|\\?\\*\\+\\-"
 
 class ControlRequest;
@@ -52,6 +61,12 @@ class DispatcherApi
 		void		write(shared_ptr<HttpServer::Response> response,
 						shared_ptr<HttpServer::Request> request);
 		void		operation(shared_ptr<HttpServer::Response> response,
+						shared_ptr<HttpServer::Request> request);
+		void		tableInsert(shared_ptr<HttpServer::Response> response,
+						shared_ptr<HttpServer::Request> request);
+		void		tableDelete(shared_ptr<HttpServer::Response> response,
+						shared_ptr<HttpServer::Request> request);
+		void		tableUpdate(shared_ptr<HttpServer::Response> response,
 						shared_ptr<HttpServer::Request> request);
 
 	private:

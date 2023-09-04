@@ -9,12 +9,13 @@
  *
  * Author: Mark Riddoch, Massimiliano Pinto
  *
- * A set of classes thatg implement the storage and execution for
+ * A set of classes that implement the storage and execution for
  * the various control requests that can be processed by the control
  * dispatcher micro service.
  */
 #include <string>
 #include <kvlist.h>
+#include <pipeline_manager.h>
 
 class DispatcherService;
 
@@ -25,24 +26,63 @@ class DispatcherService;
 class ControlRequest {
 	public:
 		virtual void execute(DispatcherService *) = 0;
+		virtual PipelineEndpoint getDestination() = 0;
 
-		void 	setSourceName(std::string& source_name)
+		/**
+		 * Set the source name from the authentication sent for
+		 * the caller. Note this is only done if the call is 
+		 * configured to be authenticated.
+		 *
+		 * @param  source_name	The name of the authenticated caller
+		 */
+		void 	setSourceName(const std::string& source_name)
 		{
 			m_source_name = source_name;
 		};
-		void 	setSourceType(std::string& source_type)
+
+		/**
+		 * Set the source type from the authentication sent for
+		 * the caller. Note this is only done if the call is 
+		 * configured to be authenticated.
+		 *
+		 * @param source_type	The type of the authenticated caller
+		 */
+		void 	setSourceType(const std::string& source_type)
 		{
 			m_source_type = source_type;
 		};
-		void    setRequestURL(std::string& url)
+
+		/**
+		 * Set the autheneticated requesting URL of
+		 * the caller. Note this is only done if the call is 
+		 * configured to be authenticated.
+		 *
+		 * @param source_type	The type of the authenticated caller
+		 */
+		void    setRequestURL(const std::string& url)
                 {
                         m_request_url = url;
                 };
+
+		/**
+		 * Add the caller information from the request. Used to
+		 * match the control pipeline.
+		 *
+		 * @param	type		The type of the caller
+		 * @param	name		The name of the caller
+		 */
+		void addCaller(const std::string& type, const std::string& name)
+		{
+			m_callerType = type;
+			m_callerName = name;
+		};
 
 	public:
 		std::string	m_source_name;
 		std::string	m_source_type;
 		std::string	m_request_url;
+		std::string	m_callerType;
+		std::string	m_callerName;
 };
 
 /**
@@ -54,6 +94,8 @@ class WriteControlRequest : public ControlRequest {
 		{
 		};
 		virtual void execute(DispatcherService *) = 0;
+	protected:
+		void	     filter(ControlPipelineManager *manager);
 	protected:
 		KVList				m_values;
 };
@@ -69,6 +111,17 @@ class ControlWriteServiceRequest : public WriteControlRequest {
 		{
 		};
 		void		execute(DispatcherService *);
+
+		/**
+		 * Return the endpoint information for the control request
+		 *
+		 * @return PipelineEndpoint	The destination endpoint of this request
+		 */
+		PipelineEndpoint
+				getDestination()
+				{
+					return PipelineEndpoint(PipelineEndpoint::EndpointService, m_service);
+				};
 	private:
 		std::string	m_service;
 };
@@ -84,6 +137,17 @@ class ControlWriteAssetRequest : public WriteControlRequest {
 		{
 		};
 		void		execute(DispatcherService *);
+
+		/**
+		 * Return the endpoint information for the control request
+		 *
+		 * @return PipelineEndpoint	The destination endpoint of this request
+		 */
+		PipelineEndpoint
+				getDestination()
+				{
+					return PipelineEndpoint(PipelineEndpoint::EndpointAsset, m_asset);
+				};
 	private:
 		std::string	m_asset;
 };
@@ -99,6 +163,17 @@ class ControlWriteScriptRequest : public WriteControlRequest {
 		{
 		};
 		void		execute(DispatcherService *);
+
+		/**
+		 * Return the endpoint information for the control request
+		 *
+		 * @return PipelineEndpoint	The destination endpoint of this request
+		 */
+		PipelineEndpoint
+				getDestination()
+				{
+					return PipelineEndpoint(PipelineEndpoint::EndpointScript, m_scriptName);
+				};
 	private:
 		std::string	m_scriptName;
 };
@@ -113,6 +188,17 @@ class ControlWriteBroadcastRequest : public WriteControlRequest {
 		{
 		};
 		void		execute(DispatcherService *);
+
+		/**
+		 * Return the endpoint information for the control request
+		 *
+		 * @return PipelineEndpoint	The destination endpoint of this request
+		 */
+		PipelineEndpoint
+				getDestination()
+				{
+					return PipelineEndpoint(PipelineEndpoint::EndpointBroadcast);
+				};
 };
 
 /**
@@ -125,6 +211,9 @@ class ControlOperationRequest : public ControlRequest {
 		{
 		};
 		virtual void	execute(DispatcherService *) = 0;
+
+	protected:
+		void		filter(ControlPipelineManager *manager);
 	protected:
 		const std::string		m_operation;
 		KVList				m_parameters;
@@ -143,12 +232,23 @@ class ControlOperationServiceRequest : public ControlOperationRequest {
 		};
 		void execute(DispatcherService *);
 
+		/**
+		 * Return the endpoint information for the control request
+		 *
+		 * @return PipelineEndpoint	The destination endpoint of this request
+		 */
+		PipelineEndpoint
+				getDestination()
+				{
+					return PipelineEndpoint(PipelineEndpoint::EndpointService, m_service);
+				};
+
 	protected:
 		const std::string	m_service;
 };
 
 /**
- * A request to execute an operation on a service responsible for the ingest o a given asset
+ * A request to execute an operation on a service responsible for the ingest to a given asset
  */
 class ControlOperationAssetRequest : public ControlOperationRequest {
 	public:
@@ -159,6 +259,17 @@ class ControlOperationAssetRequest : public ControlOperationRequest {
 		{
 		};
 		void execute(DispatcherService *);
+
+		/**
+		 * Return the endpoint information for the control request
+		 *
+		 * @return PipelineEndpoint	The destination endpoint of this request
+		 */
+		PipelineEndpoint
+				getDestination()
+				{
+					return PipelineEndpoint(PipelineEndpoint::EndpointAsset, m_asset);
+				};
 
 	protected:
 		const std::string	m_asset;
@@ -174,5 +285,16 @@ class ControlOperationBroadcastRequest : public ControlOperationRequest {
 		{
 		};
 		void execute(DispatcherService *);
+
+		/**
+		 * Return the endpoint information for the control request
+		 *
+		 * @return PipelineEndpoint	The destination endpoint of this request
+		 */
+		PipelineEndpoint
+				getDestination()
+				{
+					return PipelineEndpoint(PipelineEndpoint::EndpointBroadcast);
+				};
 };
 #endif

@@ -20,6 +20,8 @@
 #include <mutex>
 #include <condition_variable>
 #include <queue>
+#include <pipeline_manager.h>
+#include <rapidjson/document.h>
 
 #define SERVICE_NAME		"Fledge Dispatcher"
 #define SERVICE_TYPE		"Dispatcher"
@@ -61,6 +63,16 @@ class DispatcherService : public ServiceAuthHandler
 							const std::string&) {};
 		void			setDryRun() { m_dryRun = true; };
 
+		/**
+		 * Return the pipeline manager for the service.
+		 */
+		ControlPipelineManager	*getPipelineManager() { return m_pipelineManager; };
+
+		void			registerTable(const std::string& table);
+		void			rowInsert(const std::string& table, const rapidjson::Document& doc);
+		void			rowUpdate(const std::string& table, const rapidjson::Document& doc);
+		void			rowDelete(const std::string& table, const rapidjson::Document& doc);
+
 	private:
 		ControlRequest		*getRequest();
 
@@ -82,5 +94,6 @@ class DispatcherService : public ServiceAuthHandler
 		bool				m_dryRun;
 		bool				m_restartRequest;
 		bool				m_removeFromCore;
+		ControlPipelineManager		*m_pipelineManager;
 };
 #endif

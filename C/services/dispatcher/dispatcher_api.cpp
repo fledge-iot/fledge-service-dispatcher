@@ -216,6 +216,11 @@ void DispatcherApi::write(shared_ptr<HttpServer::Response> response,
 				}
 				if (writeRequest)
 				{
+					if (doc.HasMember("source") && doc["source"].IsString() &&
+						doc.HasMember("source_name") && doc["source_name"].IsString())
+					{
+						writeRequest->addCaller(doc["source"].GetString(), doc["source_name"].GetString());
+					}
 					// If authentication is set then add service name/type
 					if (auth_set)
 					{
@@ -340,6 +345,11 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 					}
 					if (opRequest)
 					{
+						if (doc.HasMember("source") && doc["source"].IsString() &&
+							doc.HasMember("source_name") && doc["source_name"].IsString())
+						{
+							opRequest->addCaller(doc["source"].GetString(), doc["source_name"].GetString());
+						}
 						// If authentication is set then add service name/type
 						if (auth_set)
 						{
@@ -352,6 +362,178 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 					}
 				}
 			}
+		}
+		else
+		{
+			string responsePayload = QUOTE({ "message" : "Failed to parse request payload" });
+			respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+		}
+		
+	} catch (exception &e) {
+		char buffer[80];
+		snprintf(buffer, sizeof(buffer), "\"Exception: %s\"", e.what());
+		string responsePayload = QUOTE({ "message" : buffer });
+		respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+	}
+	string responsePayload = QUOTE({ "message" : "Request queued" });
+	respond(response, SimpleWeb::StatusCode::success_accepted,responsePayload);
+}
+
+/**
+ * Handle a table insert request call
+ */
+void DispatcherApi::tableInsert(shared_ptr<HttpServer::Response> response,
+				      shared_ptr<HttpServer::Request> request)
+{
+	string destination, name, key, value;
+	string payload = request->content.string();
+
+	// Get authentication enabled value
+	bool auth_set = m_service->getAuthenticatedCaller();
+
+	Logger::getLogger()->debug("Service '%s' has AuthenticatedCaller flag set %d",
+				m_service->getName().c_str(),
+				auth_set);
+
+	string callerName, callerType;
+
+	// If authentication is set verify input token and service/URL ACLs
+	if (auth_set)
+	{
+		// Verify access token from caller and check caller can access dispatcher
+		// Routine sends HTTP reply in case of errors
+		if (!m_service->AuthenticationMiddlewareCommon(response,
+								request,
+								callerName,
+								callerType))
+		{
+			return;
+		}
+	}
+
+	try {
+		string table = urlDecode(request->path_match[1]);
+
+		Document doc;
+		ParseResult result = doc.Parse(payload.c_str());
+		if (result)
+		{
+			// Parse and action the table inserts
+			m_service->rowInsert(table, doc);
+		}
+		else
+		{
+			string responsePayload = QUOTE({ "message" : "Failed to parse request payload" });
+			respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+		}
+		
+	} catch (exception &e) {
+		char buffer[80];
+		snprintf(buffer, sizeof(buffer), "\"Exception: %s\"", e.what());
+		string responsePayload = QUOTE({ "message" : buffer });
+		respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+	}
+	string responsePayload = QUOTE({ "message" : "Request queued" });
+	respond(response, SimpleWeb::StatusCode::success_accepted,responsePayload);
+}
+
+/**
+ * Handle a table update request call
+ */
+void DispatcherApi::tableUpdate(shared_ptr<HttpServer::Response> response,
+				      shared_ptr<HttpServer::Request> request)
+{
+	string destination, name, key, value;
+	string payload = request->content.string();
+
+	// Get authentication enabled value
+	bool auth_set = m_service->getAuthenticatedCaller();
+
+	Logger::getLogger()->debug("Service '%s' has AuthenticatedCaller flag set %d",
+				m_service->getName().c_str(),
+				auth_set);
+
+	string callerName, callerType;
+
+	// If authentication is set verify input token and service/URL ACLs
+	if (auth_set)
+	{
+		// Verify access token from caller and check caller can access dispatcher
+		// Routine sends HTTP reply in case of errors
+		if (!m_service->AuthenticationMiddlewareCommon(response,
+								request,
+								callerName,
+								callerType))
+		{
+			return;
+		}
+	}
+
+	try {
+		string table = urlDecode(request->path_match[1]);
+
+		Document doc;
+		ParseResult result = doc.Parse(payload.c_str());
+		if (result)
+		{
+			m_service->rowUpdate(table, doc);
+		}
+		else
+		{
+			string responsePayload = QUOTE({ "message" : "Failed to parse request payload" });
+			respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+		}
+		
+	} catch (exception &e) {
+		char buffer[80];
+		snprintf(buffer, sizeof(buffer), "\"Exception: %s\"", e.what());
+		string responsePayload = QUOTE({ "message" : buffer });
+		respond(response, SimpleWeb::StatusCode::client_error_bad_request,responsePayload);
+	}
+	string responsePayload = QUOTE({ "message" : "Request queued" });
+	respond(response, SimpleWeb::StatusCode::success_accepted,responsePayload);
+}
+
+/**
+ * Handle a table delete request call
+ */
+void DispatcherApi::tableDelete(shared_ptr<HttpServer::Response> response,
+				      shared_ptr<HttpServer::Request> request)
+{
+	string destination, name, key, value;
+	string payload = request->content.string();
+
+	// Get authentication enabled value
+	bool auth_set = m_service->getAuthenticatedCaller();
+
+	Logger::getLogger()->debug("Service '%s' has AuthenticatedCaller flag set %d",
+				m_service->getName().c_str(),
+				auth_set);
+
+	string callerName, callerType;
+
+	// If authentication is set verify input token and service/URL ACLs
+	if (auth_set)
+	{
+		// Verify access token from caller and check caller can access dispatcher
+		// Routine sends HTTP reply in case of errors
+		if (!m_service->AuthenticationMiddlewareCommon(response,
+								request,
+								callerName,
+								callerType))
+		{
+			return;
+		}
+	}
+
+	try {
+		string table = urlDecode(request->path_match[1]);
+
+		Document doc;
+		ParseResult result = doc.Parse(payload.c_str());
+		if (result)
+		{
+			m_service->rowDelete(table, doc);
 		}
 		else
 		{
@@ -421,6 +603,45 @@ static void operationWrapper(shared_ptr<HttpServer::Response> response,
 }
 
 /**
+ * Wrapper for write table insert API entry point
+ *
+ * @param response	The response the should be sent
+ * @param request	The API request
+ */
+static void insertWrapper(shared_ptr<HttpServer::Response> response,
+		    shared_ptr<HttpServer::Request> request)
+{
+	DispatcherApi *api = DispatcherApi::getInstance();
+	api->tableInsert(response, request);
+}
+
+/**
+ * Wrapper for write table update API entry point
+ *
+ * @param response	The response the should be sent
+ * @param request	The API request
+ */
+static void updateWrapper(shared_ptr<HttpServer::Response> response,
+		    shared_ptr<HttpServer::Request> request)
+{
+	DispatcherApi *api = DispatcherApi::getInstance();
+	api->tableUpdate(response, request);
+}
+
+/**
+ * Wrapper for write table delete API entry point
+ *
+ * @param response	The response the should be sent
+ * @param request	The API request
+ */
+static void deleteWrapper(shared_ptr<HttpServer::Response> response,
+		    shared_ptr<HttpServer::Request> request)
+{
+	DispatcherApi *api = DispatcherApi::getInstance();
+	api->tableDelete(response, request);
+}
+
+/**
  * Initialise the API entry points for the common data resource and
  * the readings resource.
  */
@@ -435,6 +656,9 @@ void DispatcherApi::initResources()
 	// call AuthenticationMiddlewareCommon
 	m_server->resource[DISPATCH_WRITE]["POST"] = writeWrapper;
 	m_server->resource[DISPATCH_OPERATION]["POST"] = operationWrapper;
+	m_server->resource[TABLE_INSERT_URL TABLE_PATTERN]["POST"] = insertWrapper;
+	m_server->resource[TABLE_UPDATE_URL TABLE_PATTERN]["POST"] = updateWrapper;
+	m_server->resource[TABLE_DELETE_URL TABLE_PATTERN]["POST"] = deleteWrapper;
 }
 
 /**
