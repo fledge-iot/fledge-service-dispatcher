@@ -277,5 +277,16 @@ void ControlOperationRequest::filter(ControlPipelineManager *manager)
 		// Nothing to do
 		return;
 	}
-	// TODO Do the actual filtering
+	PipelineExecutionContext *context = pipeline->getExecutionContext(source, destination);
+	if (!context)
+	{
+		Logger::getLogger()->error("Unable to allocate an execution context for the control pipeline '%s'",
+				pipeline->getName());
+		return;
+	}
+	Reading *reading = m_parameters.toReading(m_operation);
+	// Filter the reading
+	context->filter(reading);
+	m_parameters.fromReading(reading);
+	delete reading;
 }
