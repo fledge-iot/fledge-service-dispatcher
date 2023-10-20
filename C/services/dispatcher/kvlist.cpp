@@ -28,11 +28,12 @@ KVList::KVList(Value& value)
 			string key = kv.name.GetString();
 			if (kv.value.IsString())
 			{
+				Logger::getLogger()->debug("Parameter: %s is %s", key.c_str(), kv.value.GetString());
 				m_list.push_back(pair<string, string>(key, kv.value.GetString()));
 			}
 			else
 			{
-				throw runtime_error("Value in key/value pair should be an integer");
+				throw runtime_error("Value in key/value pair should be a string");
 			}
 		}
 	}
@@ -94,6 +95,30 @@ string KVList::toJSON()
 }
 
 /**
+ * Return the key/value pair list as a string
+ *
+ * @return string	The key/value pair list as a string
+ */
+string KVList::toString() const
+{
+	string parameters = "( ";
+	bool first = true;
+	for (auto &p : m_list)
+	{
+		if (first)
+			first = false;
+		else
+			parameters += ", ";
+		parameters += "\"" + p.first + "\" :";
+		string escaped = p.second;
+		StringEscapeQuotes(escaped);
+		parameters += "\"" + escaped + "\"";
+	}
+	parameters += " )";
+	return parameters;
+}
+
+/**
  * Substitute values into the list.
  *
  * @param values	A key/value list of parameters to substitute
@@ -138,3 +163,101 @@ void KVList::substitute(string& value, const KVList& values)
 	Logger::getLogger()->debug("became '%s'", rval.c_str());
 	value = rval;
 }
+
+/**
+ * Construct a reading from a key/value list
+ *
+ * @param asset		The asset name to use in the reading
+ * @return Rading*	A pointer to a newly created reading
+ */
+Reading *KVList::toReading(const string& asset)
+{
+vector<Datapoint *> values;
+
+	for (auto& item: m_list)
+	{
+		// TODO need to do something with complex types
+		switch (deduceType(item.second))
+		{
+			case DatapointValue::T_STRING:
+			default:
+			{
+				DatapointValue dpv(item.second);
+				values.push_back(new Datapoint(item.first, dpv));
+				break;
+			}
+			case DatapointValue::T_INTEGER:
+			{
+				long val = strtol(item.second.c_str(), NULL, 10);
+				DatapointValue dpv(val);
+				values.push_back(new Datapoint(item.first, dpv));
+				break;
+			}
+			case DatapointValue::T_FLOAT:
+			{
+				double val = strtod(item.second.c_str(), NULL);
+				DatapointValue dpv(val);
+				values.push_back(new Datapoint(item.first, dpv));
+				break;
+			}
+		}
+	}
+	return new Reading(asset, values);
+}
+
+/**
+ * Replace the content of the Key/Value list with the datapoints in the
+ * reading that is passed in. The reading is left in tact upon return,
+ * it is the job of the caller to free the reading
+ *
+ * @param reading	The reading to extract new data from
+ */
+void KVList::fromReading(Reading *reading)
+{
+	m_list.clear();
+	vector<Datapoint *>datapoints = reading->getReadingData();
+	for (Datapoint *dp : datapoints)
+	{
+		add(dp->getName(), dp->getData().toString());
+	}
+}
+
+/**
+ * Examine the string that is passed in a deduce a suitable type
+ * for the datapoint that will be created.
+ *
+ * @param value	The value to examine
+ * @return DatapointTag	The deduced type
+ */
+DatapointValue::DatapointTag KVList::deduceType(const string& value)
+{
+DatapointValue::DatapointTag rval = DatapointValue::T_STRING;
+
+	bool numeric = true;
+	bool floating = false;
+
+	for (int i = 0; i < value.length(); i++)
+	{
+		if ((value[i] < '0' || value[i] > '9') && value[i] != '.')
+		{
+			numeric = false;
+			break;
+		}
+		else if (value[i] == '.' && floating == false)
+		{
+			floating = true;
+			break;
+		}
+		else if (value[i] == '.' && floating == true)
+		{
+			floating = false;
+			break;
+		}
+	}
+	if (numeric && floating)
+		rval = DatapointValue::T_FLOAT;
+	else if (numeric)
+		rval = DatapointValue::T_INTEGER;
+	return rval;
+}
+

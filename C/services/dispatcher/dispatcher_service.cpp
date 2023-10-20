@@ -17,6 +17,7 @@
 #include <iostream>
 #include <string>
 #include <asset_tracking.h>
+#include <audit_logger.h>
 
 #include <storage_client.h>
 #include <config_handler.h>
@@ -149,6 +150,9 @@ bool DispatcherService::start(string& coreAddress,
 
 	// Make sure we have an instance of the asset tracker
 	AssetTracker *tracker = new AssetTracker(m_mgtClient, m_name);
+
+	// Add the AuditLogger single so that it is available for audit logging
+	AuditLogger *audit = new AuditLogger(m_mgtClient);
 
 	// Create a category with Dispatcher name
 	DefaultConfigCategory dispatcherServerConfig(m_name, string("{}"));
@@ -302,6 +306,12 @@ bool DispatcherService::start(string& coreAddress,
 		{
 			new thread(worker_thread, this);
 		}
+
+		// Start the control filter pipeline manager
+		m_pipelineManager = new ControlPipelineManager(m_mgtClient, m_storage);
+		m_pipelineManager->setService(this);
+		m_pipelineManager->loadPipelines();
+
 		// .... wait until shutdown ...
 
 		// Wait for all the API threads to complete
@@ -396,6 +406,7 @@ void DispatcherService::cleanupResources()
 void DispatcherService::configChange(const string& categoryName,
 				       const string& category)
 {
+	m_logger->fatal("Categoty change '%s'", categoryName.c_str());
 	if (categoryName.compare(m_name) == 0)
 	{
 			m_logger->warn("Configuration change for '%s' category not implemented yet",
@@ -426,8 +437,7 @@ void DispatcherService::configChange(const string& categoryName,
 			}
 		}
 	}
-
-	if (categoryName.compare(m_name + "Advanced") == 0)
+	else if (categoryName.compare(m_name + "Advanced") == 0)
 	{
 		ConfigCategory config(categoryName, category);
 		if (config.itemExists("logLevel"))
@@ -436,11 +446,15 @@ void DispatcherService::configChange(const string& categoryName,
 			m_logger->info("Setting log level to %s", config.getValue("logLevel").c_str());
 		}
 	}
-
-	// Update the  Security category
-	if (categoryName.compare(m_name+"Security") == 0)
+	else if (categoryName.compare(m_name+"Security") == 0)
 	{
+		// Update the  Security category
 		this->updateSecurityCategory(category);
+	}
+	else
+	{
+		// Probably a fitler category, pass on to the pipeline_manager
+		m_pipelineManager->categoryChanged(categoryName, category);
 	}
 
 	return;
@@ -479,7 +493,7 @@ bool DispatcherService::queue(ControlRequest *request)
 }
 
 /**
- * Return the nextr request to process or NULL if the service is shutting down
+ * Return the next request to process or NULL if the service is shutting down
  *
  * @return ControlRequest*	The next request to process
  */
@@ -576,4 +590,59 @@ bool DispatcherService::sendToService(const string& serviceName,
 				serviceName.c_str(), url.c_str(), e.what());
 		return false;
 	}
+}
+
+/**
+ * Register with the storage service for inserts, updates and deletes on the
+ * given table.
+ *
+ * @param table		The table to register
+ */
+void DispatcherService::registerTable(const string& table)
+{
+	vector<string> values;
+	unsigned short port = m_api->getListenerPort();
+	char buf[80];
+	snprintf(buf, sizeof(buf), "http://localhost:%d%s%s", port, TABLE_INSERT_URL, table.c_str());
+	m_storage->registerTableNotification(table, "", values, "insert", buf);
+	snprintf(buf, sizeof(buf), "http://localhost:%d%s%s", port, TABLE_DELETE_URL, table.c_str());
+        m_storage->registerTableNotification(table, "", values, "delete", buf);
+	snprintf(buf, sizeof(buf), "http://localhost:%d%s%s", port, TABLE_UPDATE_URL, table.c_str());
+        m_storage->registerTableNotification(table, "", values, "update", buf);
+}
+
+/**
+ * Forward any inserted rows to the pipeline manager
+ *
+ * @param table		The name of the table on which the insert has occurred
+ * @param doc		The row contents that has been inserted
+ */
+void DispatcherService::rowInsert(const string& table, const rapidjson::Document& doc)
+{
+	if (m_pipelineManager)
+		m_pipelineManager->rowInsert(table, doc);
+}
+
+/**
+ * Forward any updated rows to the pipeline manager
+ *
+ * @param table		The name of the table on which the update has occurred
+ * @param doc		The row contents that has been updated
+ */
+void DispatcherService::rowUpdate(const string& table, const rapidjson::Document& doc)
+{
+	if (m_pipelineManager)
+		m_pipelineManager->rowUpdate(table, doc);
+}
+
+/**
+ * Forward any deleted rows to the pipeline manager
+ *
+ * @param table		The name of the table on which the delete has occurred
+ * @param doc		The row contents that has been deleted
+ */
+void DispatcherService::rowDelete(const string& table, const rapidjson::Document& doc)
+{
+	if (m_pipelineManager)
+		m_pipelineManager->rowDelete(table, doc);
 }

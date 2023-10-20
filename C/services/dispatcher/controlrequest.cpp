@@ -12,6 +12,8 @@
 #include <automation.h>
 #include <plugin_api.h>
 #include <asset_tracking.h>
+#include <pipeline_execution.h>
+#include <controlpipeline.h>
 
 using namespace std;
 
@@ -23,6 +25,7 @@ using namespace std;
  */
 void ControlWriteServiceRequest::execute(DispatcherService *service)
 {
+	filter(service->getPipelineManager());
 	string payload = "{ \"values\" : ";
 	payload += m_values.toJSON();
 	payload += " }";
@@ -44,6 +47,7 @@ void ControlWriteServiceRequest::execute(DispatcherService *service)
  */
 void ControlWriteBroadcastRequest::execute(DispatcherService *service)
 {
+	filter(service->getPipelineManager());
 	vector<ServiceRecord *> services;
 	service->getMgmtClient()->getServices(services, "Southbound");
 
@@ -73,6 +77,7 @@ void ControlWriteBroadcastRequest::execute(DispatcherService *service)
  */
 void ControlWriteScriptRequest::execute(DispatcherService *service)
 {
+	filter(service->getPipelineManager());
 	Script script(m_scriptName);
 
 	// Set m_source_name, m_source_name and m_request_url in the Script object
@@ -92,6 +97,7 @@ void ControlWriteScriptRequest::execute(DispatcherService *service)
  */
 void ControlWriteAssetRequest::execute(DispatcherService *service)
 {
+	filter(service->getPipelineManager());
 	AssetTracker *tracker = AssetTracker::getAssetTracker();
 	try {
 		string ingestService = tracker->getIngestService(m_asset);
@@ -118,6 +124,7 @@ void ControlWriteAssetRequest::execute(DispatcherService *service)
  */
 void ControlOperationServiceRequest::execute(DispatcherService *service)
 {
+	filter(service->getPipelineManager());
 	string payload = "{ \"operation\" : \"";
 	payload += m_operation;
 	payload += "\", ";
@@ -144,6 +151,7 @@ void ControlOperationServiceRequest::execute(DispatcherService *service)
  */
 void ControlOperationAssetRequest::execute(DispatcherService *service)
 {
+	filter(service->getPipelineManager());
 	AssetTracker *tracker = AssetTracker::getAssetTracker();
 	try {
 		string ingestService = tracker->getIngestService(m_asset);
@@ -176,6 +184,7 @@ void ControlOperationAssetRequest::execute(DispatcherService *service)
  */
 void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 {
+	filter(service->getPipelineManager());
 	vector<ServiceRecord *> services;
 	service->getMgmtClient()->getServices(services, "Southbound");
 
@@ -198,4 +207,86 @@ void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 					m_source_name,
 					m_source_type);
 	}
+}
+
+/**
+ * Pass a write control requests through a control filter pipeline
+ * if one has been defined for the the particular control pipeline.
+ *
+ * This method will look for a best match pipeline for the control request
+ * based on the source of the request and the destination of the request.
+ *
+ * If a pipeline is found then it will fetch an execution context for the
+ * pipeline and then the write request will be transformed into
+ * a reading. That reading will be passed to the pipeline and the result
+ * of that pipeline execution turned back into a control request and the
+ * request will then proceed as previously.
+ *
+ * @param manager	The control pipeline manager
+ */
+void WriteControlRequest::filter(ControlPipelineManager *manager)
+{
+	Logger::getLogger()->debug("Filtering the write request");
+	PipelineEndpoint destination = getDestination();
+	PipelineEndpoint source(PipelineEndpoint::EndpointAny);		// TODO need to get correct source
+	if (m_callerType.compare("service") == 0)
+		source = PipelineEndpoint(PipelineEndpoint::EndpointService, m_callerName);
+	ControlPipeline *pipeline = manager->findPipeline(source, destination);
+	if (!pipeline)
+	{
+		// Nothing to do
+		Logger::getLogger()->warn("No pipeline found to filter control request");
+		return;
+	}
+	PipelineExecutionContext *context = pipeline->getExecutionContext(source, destination);
+	if (!context)
+	{
+		Logger::getLogger()->error("Unable to allocate an execution context for the control pipeline '%s'",
+				pipeline->getName());
+		return;
+	}
+	Reading *reading = m_values.toReading("reading");
+	// Filter the reading
+	context->filter(reading);
+	m_values.fromReading(reading);
+	delete reading;
+}
+
+/**
+ * Pass a control operation through a control filter pipeline if
+ * one has been defined for the particular source and destination.
+ *
+ * This method will look for a best match pipeline for the control request
+ * based on the source of the request and the destination of the request.
+ *
+ * If a pipeline is found then it will fetch an execution context for the
+ * pipeline and then the write request will be transformed into
+ * a reading. That reading will be passed to the pipeline and the result
+ * of that pipeline execution turned back into a control request and the
+ * request will then proceed as previously.
+ *
+ * @param manager	The control pipeline manager
+ */
+void ControlOperationRequest::filter(ControlPipelineManager *manager)
+{
+	PipelineEndpoint destination = getDestination();
+	PipelineEndpoint source(PipelineEndpoint::EndpointAny);		// TODO need to get correct source
+	ControlPipeline *pipeline = manager->findPipeline(source, destination);
+	if (!pipeline)
+	{
+		// Nothing to do
+		return;
+	}
+	PipelineExecutionContext *context = pipeline->getExecutionContext(source, destination);
+	if (!context)
+	{
+		Logger::getLogger()->error("Unable to allocate an execution context for the control pipeline '%s'",
+				pipeline->getName());
+		return;
+	}
+	Reading *reading = m_parameters.toReading(m_operation);
+	// Filter the reading
+	context->filter(reading);
+	m_parameters.fromReading(reading);
+	delete reading;
 }
