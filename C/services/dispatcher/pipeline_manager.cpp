@@ -88,6 +88,8 @@ ControlPipelineManager::loadPipelines()
 					vector<string> filters;
 					loadFilters(pname, cpid->getInteger(), filters);
 					pipe->setPipeline(filters);
+					ResultSet::ColumnValue *en = row->getColumn("enabled");
+					pipe->enable(en->getString()[0] == 't');
 					m_pipelines[pname] = pipe;
 					m_pipelineIds[pipelineId] = pname;
 				}
