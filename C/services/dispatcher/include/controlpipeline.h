@@ -165,6 +165,16 @@ class ControlPipeline {
 		void			addFilter(const std::string& filter, int order);
 		void			removeFilter(const std::string& filter);
 		void			reorder(const std::string& filter, int order);
+
+		/**
+		 * Return true if the pipeline is enabled
+		 *
+		 * @return bool		Pipeline enabled state
+		 */
+		bool			isEnabled()
+					{
+						return m_enable;
+					}
 	private:
 		void			removeAllContexts();
 	private:
