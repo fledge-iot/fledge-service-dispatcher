@@ -238,6 +238,12 @@ void WriteControlRequest::filter(ControlPipelineManager *manager)
 		Logger::getLogger()->warn("No pipeline found to filter control request");
 		return;
 	}
+	if (!pipeline->isEnabled())
+	{
+		Logger::getLogger()->debug("Pipeline %s will be ignored as it is not enabled",
+				pipeline->getName().c_str());
+		return;
+	}
 	PipelineExecutionContext *context = pipeline->getExecutionContext(source, destination);
 	if (!context)
 	{
@@ -275,6 +281,12 @@ void ControlOperationRequest::filter(ControlPipelineManager *manager)
 	if (!pipeline)
 	{
 		// Nothing to do
+		return;
+	}
+	if (!pipeline->isEnabled())
+	{
+		Logger::getLogger()->debug("Pipeline %s will be ignored as it is not enabled",
+				pipeline->getName().c_str());
 		return;
 	}
 	PipelineExecutionContext *context = pipeline->getExecutionContext(source, destination);
