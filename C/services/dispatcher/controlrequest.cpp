@@ -240,7 +240,7 @@ void WriteControlRequest::filter(ControlPipelineManager *manager)
 	}
 	if (!pipeline->isEnabled())
 	{
-		Logger::getLogger()->info("Pipeline %s will be ignored as it is not enabled",
+		Logger::getLogger()->debug("Pipeline %s will be ignored as it is not enabled",
 				pipeline->getName().c_str());
 		return;
 	}
@@ -285,7 +285,7 @@ void ControlOperationRequest::filter(ControlPipelineManager *manager)
 	}
 	if (!pipeline->isEnabled())
 	{
-		Logger::getLogger()->info("Pipeline %s will be ignored as it is not enabled",
+		Logger::getLogger()->debug("Pipeline %s will be ignored as it is not enabled",
 				pipeline->getName().c_str());
 		return;
 	}
