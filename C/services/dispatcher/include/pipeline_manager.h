@@ -212,6 +212,7 @@ class ControlPipelineManager {
 		DispatcherService	*m_dispatcher;
 		std::map<int, std::string>
 					m_pipelineIds;
+		std::mutex		m_pipelinesMtx;
 };
 
 #endif

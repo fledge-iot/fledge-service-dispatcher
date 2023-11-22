@@ -43,6 +43,7 @@ ControlPipelineManager::~ControlPipelineManager()
 void
 ControlPipelineManager::loadPipelines()
 {
+	lock_guard<mutex> guard(m_pipelinesMtx);	// Prevent use of pipelines
 	loadLookupTables();
 	vector<Returns *>columns;
 	columns.push_back(new Returns ("cpid"));
@@ -163,6 +164,7 @@ void ControlPipelineManager::loadFilters(const string& pipeline, int cpid, vecto
 ControlPipeline *
 ControlPipelineManager::findPipeline(const PipelineEndpoint& source, const PipelineEndpoint& dest)
 {
+	lock_guard<mutex> guard(m_pipelinesMtx);
 	// First of all look for a pipeline that exactly matches our source and destination
 	for (auto const& pipe : m_pipelines)
 	{
@@ -536,6 +538,7 @@ void ControlPipelineManager::insertPipeline(const Document& doc)
 		{
 			pipe->exclusive(false);
 		}
+		lock_guard<mutex> guard(m_pipelinesMtx);
 		m_pipelines[pname] = pipe;
 	}
 }
@@ -617,6 +620,7 @@ void ControlPipelineManager::updatePipeline(const Document& doc)
 		m_logger->error("Unable to determine ID of updated pipeline, ignoring update");
 		return;
 	}
+	lock_guard<mutex> guard(m_pipelinesMtx);
 	long cpid = strtol(value.c_str(), NULL, 10);
 
 	string pipelineName = m_pipelineIds[cpid];

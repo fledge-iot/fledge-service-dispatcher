@@ -208,26 +208,6 @@ bool DispatcherService::start(string& coreAddress,
 		m_mgtClient->addChildCategories(m_name, children1);
 	}
 
-	// Register this dispatcher service with Fledge core
-	unsigned short listenerPort = m_api->getListenerPort();
-	unsigned short managementListener = m_managementApi->getListenerPort();
-	ServiceRecord record(m_name,			// Service name
-			     "Dispatcher",		// Service type
-			     "http",			// Protocol
-			     "localhost",		// Listening address
-			     listenerPort,		// Service port
-			     managementListener,	// Management port
-			     m_token);			// Token
-
-	if (!m_mgtClient->registerService(record))
-	{
-		m_logger->fatal("Unable to register service "
-				"\"Dispatcher\" for service '" + m_name + "'");
-
-		this->cleanupResources();
-		return false;
-	}
-
 	// Register m_name category to Fledge Core
 	registerCategory(m_name);
 	registerCategory(advancedCatName);
@@ -311,6 +291,27 @@ bool DispatcherService::start(string& coreAddress,
 		m_pipelineManager = new ControlPipelineManager(m_mgtClient, m_storage);
 		m_pipelineManager->setService(this);
 		m_pipelineManager->loadPipelines();
+
+		// Register this dispatcher service with Fledge core now that
+		// everything is setup and we are able to handle requests
+		unsigned short listenerPort = m_api->getListenerPort();
+		unsigned short managementListener = m_managementApi->getListenerPort();
+		ServiceRecord record(m_name,			// Service name
+				     "Dispatcher",		// Service type
+				     "http",			// Protocol
+				     "localhost",		// Listening address
+				     listenerPort,		// Service port
+				     managementListener,	// Management port
+				     m_token);			// Token
+
+		if (!m_mgtClient->registerService(record))
+		{
+			m_logger->fatal("Unable to register service "
+					"\"Dispatcher\" for service '" + m_name + "'");
+
+			this->cleanupResources();
+			return false;
+		}
 
 		// .... wait until shutdown ...
 
