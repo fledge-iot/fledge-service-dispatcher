@@ -148,6 +148,28 @@ bool DispatcherService::start(string& coreAddress,
 		return false;
 	}
 
+
+	// Register this dispatcher service with Fledge core now that
+	// everything is setup and we are able to handle requests
+	unsigned short listenerPort = m_api->getListenerPort();
+	unsigned short managementListener = m_managementApi->getListenerPort();
+	ServiceRecord record(m_name,			// Service name
+			     "Dispatcher",		// Service type
+			     "http",			// Protocol
+			     "localhost",		// Listening address
+			     listenerPort,		// Service port
+			     managementListener,	// Management port
+			     m_token);			// Token
+
+	if (!m_mgtClient->registerService(record))
+	{
+		m_logger->fatal("Unable to register service "
+				"\"Dispatcher\" for service '" + m_name + "'");
+
+		this->cleanupResources();
+		return false;
+	}
+
 	// Make sure we have an instance of the asset tracker
 	AssetTracker *tracker = new AssetTracker(m_mgtClient, m_name);
 
@@ -281,36 +303,16 @@ bool DispatcherService::start(string& coreAddress,
 		// Create default security category
 		this->createSecurityCategories(m_mgtClient, m_dryRun);
 
-		// Start the worker threads
-		for (int i = 0; i < m_worker_threads; i++)
-		{
-			new thread(worker_thread, this);
-		}
-
 		// Start the control filter pipeline manager
 		m_pipelineManager = new ControlPipelineManager(m_mgtClient, m_storage);
 		m_pipelineManager->setService(this);
 		m_pipelineManager->loadPipelines();
 
-		// Register this dispatcher service with Fledge core now that
-		// everything is setup and we are able to handle requests
-		unsigned short listenerPort = m_api->getListenerPort();
-		unsigned short managementListener = m_managementApi->getListenerPort();
-		ServiceRecord record(m_name,			// Service name
-				     "Dispatcher",		// Service type
-				     "http",			// Protocol
-				     "localhost",		// Listening address
-				     listenerPort,		// Service port
-				     managementListener,	// Management port
-				     m_token);			// Token
-
-		if (!m_mgtClient->registerService(record))
+		// Start the worker threads after loading the pipelines
+		// to prevent the execution without havign the pipelien details
+		for (int i = 0; i < m_worker_threads; i++)
 		{
-			m_logger->fatal("Unable to register service "
-					"\"Dispatcher\" for service '" + m_name + "'");
-
-			this->cleanupResources();
-			return false;
+			new thread(worker_thread, this);
 		}
 
 		// .... wait until shutdown ...
