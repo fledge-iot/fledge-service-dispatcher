@@ -77,6 +77,8 @@ class ControlRequest {
 			m_callerName = name;
 		};
 
+		PipelineEndpoint	getSource();
+
 	public:
 		std::string	m_source_name;
 		std::string	m_source_type;
