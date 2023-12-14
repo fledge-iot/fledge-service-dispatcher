@@ -409,7 +409,7 @@ void DispatcherService::cleanupResources()
 void DispatcherService::configChange(const string& categoryName,
 				       const string& category)
 {
-	m_logger->fatal("Categoty change '%s'", categoryName.c_str());
+	m_logger->debug("Category change '%s'", categoryName.c_str());
 	if (categoryName.compare(m_name) == 0)
 	{
 			m_logger->warn("Configuration change for '%s' category not implemented yet",
