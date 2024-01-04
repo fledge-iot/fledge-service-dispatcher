@@ -385,6 +385,11 @@ void DispatcherApi::operation(shared_ptr<HttpServer::Response> response,
 void DispatcherApi::tableInsert(shared_ptr<HttpServer::Response> response,
 				      shared_ptr<HttpServer::Request> request)
 {
+	// Currently skipping authentication for requests like
+	// /dispatch/table/{operation}/{object}
+	// TODO: Implement Core service bearer token to be passed in the request
+	bool checkAuth = false;
+
 	string destination, name, key, value;
 	string payload = request->content.string();
 
@@ -398,7 +403,7 @@ void DispatcherApi::tableInsert(shared_ptr<HttpServer::Response> response,
 	string callerName, callerType;
 
 	// If authentication is set verify input token and service/URL ACLs
-	if (auth_set)
+	if (checkAuth && auth_set)
 	{
 		// Verify access token from caller and check caller can access dispatcher
 		// Routine sends HTTP reply in case of errors
@@ -443,6 +448,11 @@ void DispatcherApi::tableInsert(shared_ptr<HttpServer::Response> response,
 void DispatcherApi::tableUpdate(shared_ptr<HttpServer::Response> response,
 				      shared_ptr<HttpServer::Request> request)
 {
+	// Currently skipping authentication for requests like
+	// /dispatch/table/{operation}/{object}
+	// TODO: Implement Core service bearer token to be passed in the request
+	bool checkAuth = false;
+
 	string destination, name, key, value;
 	string payload = request->content.string();
 
@@ -456,7 +466,7 @@ void DispatcherApi::tableUpdate(shared_ptr<HttpServer::Response> response,
 	string callerName, callerType;
 
 	// If authentication is set verify input token and service/URL ACLs
-	if (auth_set)
+	if (checkAuth && auth_set)
 	{
 		// Verify access token from caller and check caller can access dispatcher
 		// Routine sends HTTP reply in case of errors
@@ -500,6 +510,11 @@ void DispatcherApi::tableUpdate(shared_ptr<HttpServer::Response> response,
 void DispatcherApi::tableDelete(shared_ptr<HttpServer::Response> response,
 				      shared_ptr<HttpServer::Request> request)
 {
+	// Currently skipping authentication for requests like
+	// /dispatch/table/{operation}/{object}
+	// TODO: Implement Core service bearer token to be passed in the request
+	bool checkAuth = false;
+
 	string destination, name, key, value;
 	string payload = request->content.string();
 
@@ -513,7 +528,7 @@ void DispatcherApi::tableDelete(shared_ptr<HttpServer::Response> response,
 	string callerName, callerType;
 
 	// If authentication is set verify input token and service/URL ACLs
-	if (auth_set)
+	if (checkAuth && auth_set)
 	{
 		// Verify access token from caller and check caller can access dispatcher
 		// Routine sends HTTP reply in case of errors
