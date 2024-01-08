@@ -7,7 +7,7 @@
  *
  * Released under the Apache 2.0 Licence
  *
- * Author: Mark Riddoch
+ * Author: Mark Riddoch, Massimiliano Pinto
  *
  */
 #include <management_client.h>
@@ -156,8 +156,10 @@ class ControlPipelineManager {
 	public:
 		ControlPipelineManager(ManagementClient *mgtClient, StorageClient *storage);
 		~ControlPipelineManager();
-		void			loadPipelines();
-		ControlPipeline		*findPipeline(const PipelineEndpoint& source, const PipelineEndpoint& dest);
+		void			loadPipelines(); // From storage
+		long			loadPipeline(std::string& pName); // From storage
+		ControlPipeline		*findPipeline(const PipelineEndpoint& source,
+							const PipelineEndpoint& dest); // From memory
 
 		/**
 		 * Return a point to the management client
