@@ -49,9 +49,14 @@ DispatcherApi::DispatcherApi(const unsigned short port,
  */
 DispatcherApi::~DispatcherApi()
 {
-	delete m_server;
 	if (m_thread)
+	{
+		stop();
+		wait();
 		delete m_thread;
+	}
+	if (m_server)
+		delete m_server;
 }
 
 /**
