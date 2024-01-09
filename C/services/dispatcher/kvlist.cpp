@@ -202,6 +202,13 @@ vector<Datapoint *> values;
 			}
 		}
 	}
+	// We can not have a reading with no data points, so if we have no parameters
+	// we must add a dummy datapoint to pass the operation through the filter
+	if (values.size() == 0)
+	{
+		DatapointValue dpv("None");
+		values.push_back(new Datapoint("__None__", dpv));
+	}
 	return new Reading(asset, values);
 }
 
@@ -218,10 +225,14 @@ void KVList::fromReading(Reading *reading)
 	vector<Datapoint *>datapoints = reading->getReadingData();
 	for (Datapoint *dp : datapoints)
 	{
-		if (dp->getData().getType() == DatapointValue::T_STRING)
-			add(dp->getName(), dp->getData().toStringValue());
-		else
-			add(dp->getName(), dp->getData().toString());
+		// Remove the dummy datapoint that was added
+		if (dp->getName().compare("__None__") != 0)
+		{
+			if (dp->getData().getType() == DatapointValue::T_STRING)
+				add(dp->getName(), dp->getData().toStringValue());
+			else
+				add(dp->getName(), dp->getData().toString());
+		}
 	}
 }
 
