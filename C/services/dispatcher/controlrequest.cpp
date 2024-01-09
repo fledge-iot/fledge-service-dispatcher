@@ -211,7 +211,7 @@ void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 
 /**
  * Pass a write control requests through a control filter pipeline
- * if one has been defined for the the particular control pipeline.
+ * if one has been defined for the particular control pipeline.
  *
  * This method will look for a best match pipeline for the control request
  * based on the source of the request and the destination of the request.
@@ -228,14 +228,18 @@ void WriteControlRequest::filter(ControlPipelineManager *manager)
 {
 	Logger::getLogger()->debug("Filtering the write request");
 	PipelineEndpoint destination = getDestination();
-	PipelineEndpoint source(PipelineEndpoint::EndpointAny);		// TODO need to get correct source
-	if (m_callerType.compare("service") == 0)
-		source = PipelineEndpoint(PipelineEndpoint::EndpointService, m_callerName);
+	PipelineEndpoint source = getSource();
 	ControlPipeline *pipeline = manager->findPipeline(source, destination);
 	if (!pipeline)
 	{
 		// Nothing to do
 		Logger::getLogger()->warn("No pipeline found to filter control request");
+		return;
+	}
+	if (!pipeline->isEnabled())
+	{
+		Logger::getLogger()->debug("Pipeline %s will be ignored as it is not enabled",
+				pipeline->getName().c_str());
 		return;
 	}
 	PipelineExecutionContext *context = pipeline->getExecutionContext(source, destination);
@@ -250,6 +254,36 @@ void WriteControlRequest::filter(ControlPipelineManager *manager)
 	context->filter(reading);
 	m_values.fromReading(reading);
 	delete reading;
+}
+
+/**
+ * Return the source of the control request
+ *
+ * @return PipelineEndpoint	The source of the control request
+ */
+PipelineEndpoint ControlRequest::getSource()
+{
+	if (m_callerType.compare("API") == 0)
+	{
+		return PipelineEndpoint(PipelineEndpoint::EndpointAPI, m_callerName);
+	}
+	else if (m_callerType.compare("service") == 0)
+	{
+		return PipelineEndpoint(PipelineEndpoint::EndpointService, m_callerName);
+	}
+	else if (m_callerType.compare("script") == 0)
+	{
+		return PipelineEndpoint(PipelineEndpoint::EndpointScript, m_callerName);
+	}
+	else if (m_callerType.compare("notification") == 0)
+	{
+		return PipelineEndpoint(PipelineEndpoint::EndpointNotification, m_callerName);
+	}
+	else if (m_callerType.compare("schedule") == 0)
+	{
+		return PipelineEndpoint(PipelineEndpoint::EndpointSchedule, m_callerName);
+	}
+	return PipelineEndpoint(PipelineEndpoint::EndpointAny);
 }
 
 /**
@@ -270,11 +304,17 @@ void WriteControlRequest::filter(ControlPipelineManager *manager)
 void ControlOperationRequest::filter(ControlPipelineManager *manager)
 {
 	PipelineEndpoint destination = getDestination();
-	PipelineEndpoint source(PipelineEndpoint::EndpointAny);		// TODO need to get correct source
+	PipelineEndpoint source = getSource();
 	ControlPipeline *pipeline = manager->findPipeline(source, destination);
 	if (!pipeline)
 	{
 		// Nothing to do
+		return;
+	}
+	if (!pipeline->isEnabled())
+	{
+		Logger::getLogger()->debug("Pipeline %s will be ignored as it is not enabled",
+				pipeline->getName().c_str());
 		return;
 	}
 	PipelineExecutionContext *context = pipeline->getExecutionContext(source, destination);

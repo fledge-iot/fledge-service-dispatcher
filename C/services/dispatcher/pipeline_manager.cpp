@@ -5,7 +5,7 @@
  *
  * Released under the Apache 2.0 Licence
  *
- * Author: Mark Riddoch
+ * Author: Mark Riddoch, Massimiliano Pinto
  *
  */
 
@@ -43,6 +43,7 @@ ControlPipelineManager::~ControlPipelineManager()
 void
 ControlPipelineManager::loadPipelines()
 {
+	lock_guard<mutex> guard(m_pipelinesMtx);	// Prevent use of pipelines
 	loadLookupTables();
 	vector<Returns *>columns;
 	columns.push_back(new Returns ("cpid"));
@@ -88,6 +89,8 @@ ControlPipelineManager::loadPipelines()
 					vector<string> filters;
 					loadFilters(pname, cpid->getInteger(), filters);
 					pipe->setPipeline(filters);
+					ResultSet::ColumnValue *en = row->getColumn("enabled");
+					pipe->enable(en->getString()[0] == 't');
 					m_pipelines[pname] = pipe;
 					m_pipelineIds[pipelineId] = pname;
 				}
@@ -161,6 +164,7 @@ void ControlPipelineManager::loadFilters(const string& pipeline, int cpid, vecto
 ControlPipeline *
 ControlPipelineManager::findPipeline(const PipelineEndpoint& source, const PipelineEndpoint& dest)
 {
+	lock_guard<mutex> guard(m_pipelinesMtx);
 	// First of all look for a pipeline that exactly matches our source and destination
 	for (auto const& pipe : m_pipelines)
 	{
@@ -534,7 +538,22 @@ void ControlPipelineManager::insertPipeline(const Document& doc)
 		{
 			pipe->exclusive(false);
 		}
-		m_pipelines[pname] = pipe;
+
+		lock_guard<mutex> guard(m_pipelinesMtx);
+
+		// Load pipeline from storage and get cpid value
+		long pipelineId = loadPipeline(pname);
+		if (pipelineId > 0)
+		{
+			// store pipeline object
+			m_pipelines[pname] = pipe;
+
+			// store pipeline id
+			m_pipelineIds[pipelineId] = pname;
+		} else {
+			m_logger->error("Failed to setup control pipeline '%s'",
+					pname.c_str());
+		}
 	}
 }
 
@@ -615,6 +634,7 @@ void ControlPipelineManager::updatePipeline(const Document& doc)
 		m_logger->error("Unable to determine ID of updated pipeline, ignoring update");
 		return;
 	}
+	lock_guard<mutex> guard(m_pipelinesMtx);
 	long cpid = strtol(value.c_str(), NULL, 10);
 
 	string pipelineName = m_pipelineIds[cpid];
@@ -714,6 +734,7 @@ void ControlPipelineManager::updatePipelineFilter(const Document& doc)
 void ControlPipelineManager::deletePipeline(const Document& doc)
 {
 	string value = getFromJSONWhere(doc, "cpid");
+
 	if (value.empty())
 	{
 		m_logger->error("Unable to determine ID of pipeline to delete, ignoring delete");
@@ -721,6 +742,7 @@ void ControlPipelineManager::deletePipeline(const Document& doc)
 	}
 	long cpid = strtol(value.c_str(), NULL, 10);
 	string pipelineName = m_pipelineIds[cpid];
+
 	m_pipelineIds.erase(cpid);
 	ControlPipeline *pipeline = m_pipelines[pipelineName];
 	m_pipelines.erase(pipelineName);
@@ -783,8 +805,19 @@ string ControlPipelineManager::getFromJSONWhere(const Document& doc, const strin
 		{
 			if (where.HasMember("value") && where["value"].IsString())
 			{
-				result = where["value"].GetString();
+				result = std::to_string(strtol(where["value"].GetString(), NULL, 10));
 			}
+			else if (where.HasMember("value") && where["value"].IsInt64())
+			{
+				result = std::to_string(where["value"].GetInt64());
+			}
+			else
+			{
+				if (where.HasMember("value") && where["value"].IsInt())
+				{
+					result = std::to_string(where["value"].GetInt());
+				}
+                        }
 		}
 		else if (where.HasMember("and") && where["and"].IsObject())
 		{
@@ -794,10 +827,86 @@ string ControlPipelineManager::getFromJSONWhere(const Document& doc, const strin
 			{
 				if (second.HasMember("value") && second["value"].IsString())
 				{
-					result = second["value"].GetString();
+					result = strtol(second["value"].GetString(), NULL, 10);
+				}
+				else if (second.HasMember("value") && second["value"].IsInt64())
+				{
+					result = second["value"].GetInt64();
+				}
+				else
+				{
+					if (second.HasMember("value") && second["value"].IsInt())
+					{
+						result = second["value"].GetInt();
+					}
 				}
 			}
 		}
 	}
+
 	return result;
+}
+
+/**
+ * Do the load of a given control pipeline name (just added)
+ * from storage and get the cpid value and store it in memory
+ *
+ * @param name The pipeline name to load from storage
+ * @return piplineId or -1 in case of errors
+ */
+long
+ControlPipelineManager::loadPipeline(string& pName)
+{
+	vector<Returns *>columns;
+	// Look for pname pipeline in storage
+	Where *where = new Where("name", Equals, pName);
+	// Get back cpid and name columns
+	columns.push_back(new Returns ("cpid"));
+	columns.push_back(new Returns ("name"));
+	Query aPipeline(columns, where);
+
+	long pipelineId = -1;
+
+	try {
+		ResultSet *pipeline = m_storage->queryTable(PIPELINES_TABLE, aPipeline);
+		if (pipeline->rowCount() > 0)
+		{
+			ResultSet::RowIterator it = pipeline->firstRow();
+			do
+			{
+				ResultSet::Row *row = *it;
+				if (row)
+				{
+					ResultSet::ColumnValue *name = row->getColumn("name");
+					string pipelineName = name->getString();
+					if (pipelineName == pName) {
+						// Match found
+						ResultSet::ColumnValue *cpid = row->getColumn("cpid");
+
+						// Set return value
+						pipelineId = cpid->getInteger();
+						break;
+					}
+				}
+				if (! pipeline->isLastRow(it))
+				{
+					it++;
+				}
+			}  while (! pipeline->isLastRow(it));
+		}
+		delete pipeline;
+	} catch (exception* exp) {
+		m_logger->error("Exception loading control pipeline '%s': %s",
+				pName.c_str(),
+				exp->what());
+	} catch (exception& ex) {
+		m_logger->error("Exception loading control pipeline '%s': %s",
+				pName.c_str(),
+				ex.what());
+	} catch (...) {
+		m_logger->error("Exception loading control pipeline '%s'",
+				pName.c_str());
+	}
+
+	return pipelineId;
 }
