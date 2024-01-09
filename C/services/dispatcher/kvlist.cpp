@@ -218,10 +218,14 @@ void KVList::fromReading(Reading *reading)
 	vector<Datapoint *>datapoints = reading->getReadingData();
 	for (Datapoint *dp : datapoints)
 	{
-		if (dp->getData().getType() == DatapointValue::T_STRING)
-			add(dp->getName(), dp->getData().toStringValue());
-		else
-			add(dp->getName(), dp->getData().toString());
+		try {
+			if (dp->getData().getType() == DatapointValue::T_STRING)
+				add(dp->getName(), dp->getData().toStringValue());
+			else
+				add(dp->getName(), dp->getData().toString());
+		} catch (exception& e) {
+			Logger::getLogger()->warn("Unable to add datapoint %s of type %s returned from pipeline, %s.", dp->getName(), dp->getData().getTypeStr(), e.what());
+		}
 	}
 }
 
