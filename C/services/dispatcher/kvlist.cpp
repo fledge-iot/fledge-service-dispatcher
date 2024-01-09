@@ -228,10 +228,14 @@ void KVList::fromReading(Reading *reading)
 		// Remove the dummy datapoint that was added
 		if (dp->getName().compare("__None__") != 0)
 		{
-			if (dp->getData().getType() == DatapointValue::T_STRING)
-				add(dp->getName(), dp->getData().toStringValue());
-			else
-				add(dp->getName(), dp->getData().toString());
+			try {
+				if (dp->getData().getType() == DatapointValue::T_STRING)
+					add(dp->getName(), dp->getData().toStringValue());
+				else
+					add(dp->getName(), dp->getData().toString());
+			} catch (exception& e) {
+				Logger::getLogger()->warn("Unable to add datapoint %s of type %s returned from pipeline, %s.", dp->getName(), dp->getData().getTypeStr(), e.what());
+			}
 		}
 	}
 }
