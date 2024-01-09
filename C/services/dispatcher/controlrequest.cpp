@@ -251,7 +251,7 @@ void WriteControlRequest::filter(ControlPipelineManager *manager)
 	}
 	Reading *reading = m_values.toReading("reading");
 	// Filter the reading
-	context->filter(reading);
+	reading = context->filter(reading);
 	m_values.fromReading(reading);
 	delete reading;
 }
@@ -326,7 +326,9 @@ void ControlOperationRequest::filter(ControlPipelineManager *manager)
 	}
 	Reading *reading = m_parameters.toReading(m_operation);
 	// Filter the reading
-	context->filter(reading);
+	reading = context->filter(reading);
 	m_parameters.fromReading(reading);
+	// All the filter pipeline to change the operation name
+	m_operation = reading->getAssetName();
 	delete reading;
 }

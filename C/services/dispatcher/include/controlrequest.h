@@ -217,7 +217,7 @@ class ControlOperationRequest : public ControlRequest {
 	protected:
 		void		filter(ControlPipelineManager *manager);
 	protected:
-		const std::string		m_operation;
+		std::string			m_operation;
 		KVList				m_parameters;
 };
 
