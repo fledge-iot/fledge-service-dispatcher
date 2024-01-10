@@ -127,10 +127,10 @@ void ControlOperationServiceRequest::execute(DispatcherService *service)
 	filter(service->getPipelineManager());
 	string payload = "{ \"operation\" : \"";
 	payload += m_operation;
-	payload += "\", ";
+	payload += "\"";
 	if (m_parameters.size() > 0)
 	{
-		payload += "\"parameters\" : ";
+		payload += ", \"parameters\" : ";
 		payload += m_parameters.toJSON();
 	}
 	payload += " }";
@@ -157,10 +157,10 @@ void ControlOperationAssetRequest::execute(DispatcherService *service)
 		string ingestService = tracker->getIngestService(m_asset);
 		string payload = "{ \"operation\" : \"";
 		payload += m_operation;
-		payload += "\", ";
+		payload += "\"";
 		if (m_parameters.size() > 0)
 		{
-			payload += "\"parameters\" : ";
+			payload += ", \"parameters\" : ";
 			payload += m_parameters.toJSON();
 		}
 		payload += " }";
@@ -190,10 +190,10 @@ void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 
 	string payload = "{ \"operation\" : \"";
 	payload += m_operation;
-	payload += "\", ";
+	payload += "\"";
 	if (m_parameters.size() > 0)
 	{
-		payload += "\"parameters\" : ";
+		payload += ", \"parameters\" : ";
 		payload += m_parameters.toJSON();
 	}
 	payload += " }";
