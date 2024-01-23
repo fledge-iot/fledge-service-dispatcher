@@ -359,7 +359,7 @@ ControlPipelineManager::EndpointLookup::EndpointLookup(const ControlPipelineMana
 
 /**
  * Register a category name for a filter plugin. This allows the pipeline manager
- * to reconfigure the filters inthe various pipelines when a category is changed.
+ * to reconfigure the filters in the various pipelines when a category is changed.
  *
  * @param category	The name of the category to register
  * @param plugin	The plugin that requires the category
@@ -405,6 +405,7 @@ void ControlPipelineManager::categoryChanged(const string& name, const string& c
 	while (it != m_categories.end())
 	{
 		it->second->reconfigure(content);
+		it++;
 	}
 }
 
