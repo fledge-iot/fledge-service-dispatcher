@@ -253,7 +253,10 @@ void WriteControlRequest::filter(ControlPipelineManager *manager)
 	// Filter the reading
 	reading = context->filter(reading);
 	m_values.fromReading(reading);
-	delete reading;
+	if (reading)
+	{
+		delete reading;
+	}
 }
 
 /**
@@ -329,6 +332,9 @@ void ControlOperationRequest::filter(ControlPipelineManager *manager)
 	reading = context->filter(reading);
 	m_parameters.fromReading(reading);
 	// All the filter pipeline to change the operation name
-	m_operation = reading->getAssetName();
-	delete reading;
+	if (reading)
+	{
+		m_operation = reading->getAssetName();
+		delete reading;
+	}
 }
