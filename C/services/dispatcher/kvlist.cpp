@@ -222,6 +222,8 @@ vector<Datapoint *> values;
 void KVList::fromReading(Reading *reading)
 {
 	m_list.clear();
+	if (!reading)
+		return;
 	vector<Datapoint *>datapoints = reading->getReadingData();
 	for (Datapoint *dp : datapoints)
 	{
