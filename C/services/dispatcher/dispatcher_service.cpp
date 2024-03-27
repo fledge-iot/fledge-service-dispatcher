@@ -338,7 +338,7 @@ bool DispatcherService::start(string& coreAddress,
 		// Request the core to restart the service
 		m_mgtClient->restartService();
 	}
-	else if (m_removeFromCore)
+	else if (m_removeFromCore && (!m_dryRun))
 	{
 		// Unregister from storage service
 		m_mgtClient->unregisterService();
