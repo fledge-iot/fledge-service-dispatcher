@@ -299,10 +299,13 @@ bool DispatcherService::start(string& coreAddress,
 		m_mgtClient->addAuditEntry("DSPST",
 						"INFORMATION",
 						"{\"name\": \"" + m_name + "\"}");
+	}
 
-		// Create default security category
-		this->createSecurityCategories(m_mgtClient, m_dryRun);
+	// Create default security category
+	this->createSecurityCategories(m_mgtClient, m_dryRun);
 
+	if (!m_dryRun)
+	{
 		// Start the control filter pipeline manager
 		m_pipelineManager = new ControlPipelineManager(m_mgtClient, m_storage);
 		m_pipelineManager->setService(this);
@@ -335,7 +338,7 @@ bool DispatcherService::start(string& coreAddress,
 		// Request the core to restart the service
 		m_mgtClient->restartService();
 	}
-	else if (m_removeFromCore)
+	else if (m_removeFromCore && (!m_dryRun))
 	{
 		// Unregister from storage service
 		m_mgtClient->unregisterService();
