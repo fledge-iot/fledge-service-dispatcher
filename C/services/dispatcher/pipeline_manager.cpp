@@ -107,7 +107,7 @@ ControlPipelineManager::loadPipelines()
 		m_logger->error("Exception loading control pipelines");
 	}
 
-	m_logger->debug("%d pipelines have benn loaded", m_pipelines.size());
+	m_logger->debug("%d pipelines have been loaded", m_pipelines.size());
 
 	// Register for updates to the table
 	m_dispatcher->registerTable(PIPELINES_TABLE);
@@ -359,7 +359,7 @@ ControlPipelineManager::EndpointLookup::EndpointLookup(const ControlPipelineMana
 
 /**
  * Register a category name for a filter plugin. This allows the pipeline manager
- * to reconfigure the filters inthe various pipelines when a category is changed.
+ * to reconfigure the filters in the various pipelines when a category is changed.
  *
  * @param category	The name of the category to register
  * @param plugin	The plugin that requires the category
@@ -405,6 +405,7 @@ void ControlPipelineManager::categoryChanged(const string& name, const string& c
 	while (it != m_categories.end())
 	{
 		it->second->reconfigure(content);
+		it++;
 	}
 }
 
@@ -569,10 +570,9 @@ void ControlPipelineManager::insertPipelineFilter(const Document& doc)
 	int id, order;
 	string filter;
 
-	if (doc.HasMember("cpid") && doc["cpid"].IsString())
+	if (doc.HasMember("cpid") && doc["cpid"].IsInt())
 	{
-		string s = doc["cpid"].GetString();
-		id = strtol(s.c_str(), NULL, 10);
+		id = doc["cpid"].GetInt();
 	}
 	else
 	{

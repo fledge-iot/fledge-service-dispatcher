@@ -127,10 +127,10 @@ void ControlOperationServiceRequest::execute(DispatcherService *service)
 	filter(service->getPipelineManager());
 	string payload = "{ \"operation\" : \"";
 	payload += m_operation;
-	payload += "\", ";
+	payload += "\"";
 	if (m_parameters.size() > 0)
 	{
-		payload += "\"parameters\" : ";
+		payload += ", \"parameters\" : ";
 		payload += m_parameters.toJSON();
 	}
 	payload += " }";
@@ -157,10 +157,10 @@ void ControlOperationAssetRequest::execute(DispatcherService *service)
 		string ingestService = tracker->getIngestService(m_asset);
 		string payload = "{ \"operation\" : \"";
 		payload += m_operation;
-		payload += "\", ";
+		payload += "\"";
 		if (m_parameters.size() > 0)
 		{
-			payload += "\"parameters\" : ";
+			payload += ", \"parameters\" : ";
 			payload += m_parameters.toJSON();
 		}
 		payload += " }";
@@ -190,10 +190,10 @@ void ControlOperationBroadcastRequest::execute(DispatcherService *service)
 
 	string payload = "{ \"operation\" : \"";
 	payload += m_operation;
-	payload += "\", ";
+	payload += "\"";
 	if (m_parameters.size() > 0)
 	{
-		payload += "\"parameters\" : ";
+		payload += ", \"parameters\" : ";
 		payload += m_parameters.toJSON();
 	}
 	payload += " }";
@@ -251,9 +251,12 @@ void WriteControlRequest::filter(ControlPipelineManager *manager)
 	}
 	Reading *reading = m_values.toReading("reading");
 	// Filter the reading
-	context->filter(reading);
+	reading = context->filter(reading);
 	m_values.fromReading(reading);
-	delete reading;
+	if (reading)
+	{
+		delete reading;
+	}
 }
 
 /**
@@ -326,7 +329,12 @@ void ControlOperationRequest::filter(ControlPipelineManager *manager)
 	}
 	Reading *reading = m_parameters.toReading(m_operation);
 	// Filter the reading
-	context->filter(reading);
+	reading = context->filter(reading);
 	m_parameters.fromReading(reading);
-	delete reading;
+	// All the filter pipeline to change the operation name
+	if (reading)
+	{
+		m_operation = reading->getAssetName();
+		delete reading;
+	}
 }
