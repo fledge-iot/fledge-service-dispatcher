@@ -688,14 +688,20 @@ void ControlPipelineManager::updatePipelineFilter(const Document& doc)
 		m_logger->error("Unable to determine the name of the filter to reorder");
 		return;
 	}
-	string name = m_pipelineIds[cpid];
-	ControlPipeline *pipeline = m_pipelines[name];
-	if (!pipeline)
-	{
+
+	auto pipelineIdIterator = m_pipelineIds.find(cpid);
+	if (pipelineIdIterator == m_pipelineIds.end()) {
+		m_logger->error("Unable to find pipeline with id %d, filter pipeline update ignored", cpid);
+		return;
+	}
+	auto name = pipelineIdIterator->second;
+	auto pipelineIterator = m_pipelines.find(name);
+	if (pipelineIterator == m_pipelines.end()) {
 		m_logger->error("Pipeline %s has not been loaded, update ignored", name.c_str());
 		return;
 	}
 
+	ControlPipeline *pipeline = pipelineIterator->second;
 	// We have the pipeline ID, not work out what has changed
 	if (doc.HasMember("values") && doc["values"].IsObject())
 	{
