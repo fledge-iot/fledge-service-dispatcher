@@ -622,7 +622,7 @@ void ControlPipelineManager::insertPipelineFilter(const Document& doc)
  *
  * The document passed will look as follows
  *
- * {"values": {"enabled": "t", "execution": "Shared", "stype": 1, "sname": "", "dtype": 4, "dname": ""}, "where": {"column": "cpid", "condition": "=", "value": "1"}}
+ * {"values": {"enabled": "t", "execution": "Shared", "stype": 1, "sname": "", "dtype": 4, "dname": ""}, "where": {"column": "cpid", "condition": "=", "value": 1}}
 
  * @param doc	The new pipeline table contents
  */
@@ -637,14 +637,19 @@ void ControlPipelineManager::updatePipeline(const Document& doc)
 	lock_guard<mutex> guard(m_pipelinesMtx);
 	long cpid = strtol(value.c_str(), NULL, 10);
 
-	string pipelineName = m_pipelineIds[cpid];
-	if (pipelineName.empty())
-	{
+	auto pipelineIDIterator = m_pipelineIds.find(cpid);
+	if (pipelineIDIterator == m_pipelineIds.end()) {
 		m_logger->error("Unable to determine name of updated pipeline %d, ignoring update", cpid);
 		return;
 	}
+	string pipelineName = pipelineIDIterator->second;
+	auto pipelineIterator = m_pipelines.find(pipelineName);
+	if (pipelineIterator == m_pipelines.end()) {
+		m_logger->error("Pipeline %s has not been loaded, update ignored", pipelineName.c_str());
+		return;
+	}
 
-	ControlPipeline *pipeline = m_pipelines[pipelineName];
+	ControlPipeline *pipeline = pipelineIterator->second;
 	if (doc.HasMember("values") && doc["values"].IsObject())
 	{
 		const Value& values = doc["values"];
@@ -689,12 +694,12 @@ void ControlPipelineManager::updatePipelineFilter(const Document& doc)
 		return;
 	}
 
-	auto pipelineIdIterator = m_pipelineIds.find(cpid);
-	if (pipelineIdIterator == m_pipelineIds.end()) {
+	auto pipelineIDIterator = m_pipelineIds.find(cpid);
+	if (pipelineIDIterator == m_pipelineIds.end()) {
 		m_logger->error("Unable to find pipeline with id %d, filter pipeline update ignored", cpid);
 		return;
 	}
-	auto name = pipelineIdIterator->second;
+	string name = pipelineIDIterator->second;
 	auto pipelineIterator = m_pipelines.find(name);
 	if (pipelineIterator == m_pipelines.end()) {
 		m_logger->error("Pipeline %s has not been loaded, update ignored", name.c_str());
@@ -798,6 +803,7 @@ void ControlPipelineManager::deletePipelineFilter(const Document& doc)
  * @param doc	The JSON document containing the where clause
  * @param key	The key to extract
  * @return string	The key value
+ * 
  */
 string ControlPipelineManager::getFromJSONWhere(const Document& doc, const string& key)
 {
@@ -811,7 +817,7 @@ string ControlPipelineManager::getFromJSONWhere(const Document& doc, const strin
 		{
 			if (where.HasMember("value") && where["value"].IsString())
 			{
-				result = std::to_string(strtol(where["value"].GetString(), NULL, 10));
+				result = where["value"].GetString();
 			}
 			else if (where.HasMember("value") && where["value"].IsInt64())
 			{
@@ -833,17 +839,17 @@ string ControlPipelineManager::getFromJSONWhere(const Document& doc, const strin
 			{
 				if (second.HasMember("value") && second["value"].IsString())
 				{
-					result = strtol(second["value"].GetString(), NULL, 10);
+					result = second["value"].GetString();
 				}
 				else if (second.HasMember("value") && second["value"].IsInt64())
 				{
-					result = second["value"].GetInt64();
+					result = std::to_string(second["value"].GetInt64());
 				}
 				else
 				{
 					if (second.HasMember("value") && second["value"].IsInt())
 					{
-						result = second["value"].GetInt();
+						result = std::to_string(second["value"].GetInt());
 					}
 				}
 			}
