@@ -161,13 +161,16 @@ bool DispatcherService::start(string& coreAddress,
 			     managementListener,	// Management port
 			     m_token);			// Token
 
-	if (!m_mgtClient->registerService(record))
+	if (!m_dryRun)
 	{
-		m_logger->fatal("Unable to register service "
-				"\"Dispatcher\" for service '" + m_name + "'");
+		if (!m_mgtClient->registerService(record))
+		{
+			m_logger->fatal("Unable to register service "
+					"\"Dispatcher\" for service '" + m_name + "'");
 
-		this->cleanupResources();
-		return false;
+			this->cleanupResources();
+			return false;
+		}
 	}
 
 	// Make sure we have an instance of the asset tracker
@@ -230,10 +233,13 @@ bool DispatcherService::start(string& coreAddress,
 		m_mgtClient->addChildCategories(m_name, children1);
 	}
 
-	// Register m_name category to Fledge Core
-	registerCategory(m_name);
-	registerCategory(advancedCatName);
-	registerCategory(serverCatName);
+	if (!m_dryRun)
+	{
+		// Register m_name category to Fledge Core
+		registerCategory(m_name);
+		registerCategory(advancedCatName);
+		registerCategory(serverCatName);
+	}
 
 	ConfigCategory serverCategory = m_mgtClient->getCategory(serverCatName);
 	if (serverCategory.itemExists("enable"))
