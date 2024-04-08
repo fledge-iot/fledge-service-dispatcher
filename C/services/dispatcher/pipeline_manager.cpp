@@ -562,7 +562,7 @@ void ControlPipelineManager::insertPipeline(const Document& doc)
  * Called when a new filter is inserted into a pipeline. The document
  * passed contains the database row that was inserted.
  *
- * {"cpid": "3", "forder": 1, "fname": "ctrl_test3_exp1"}
+ * {"cpid": 3, "forder": 1, "fname": "ctrl_test3_exp1"}
  * @param doc	The new filter table contents
  */
 void ControlPipelineManager::insertPipelineFilter(const Document& doc)
@@ -675,7 +675,7 @@ void ControlPipelineManager::updatePipeline(const Document& doc)
  * Called when a new filter is inserted into a pipeline. The document
  * passed contains the database row that was inserted.
  *
- * {"values": {"forder": 2}, "where": {"column": "fname", "condition": "=", "value": "ctrl_test1_rename", "and": {"column": "cpid", "condition": "=", "value": "1"}}}
+ * {"values": {"forder": 2}, "where": {"column": "fname", "condition": "=", "value": "ctrl_test1_rename", "and": {"column": "cpid", "condition": "=", "value": 1}}}
  * @param doc	The new filter table contents
  */
 void ControlPipelineManager::updatePipelineFilter(const Document& doc)
@@ -763,7 +763,7 @@ void ControlPipelineManager::deletePipeline(const Document& doc)
  * Called when a new filter is inserted into a pipeline. The document
  * passed contains the database row that was inserted.
  *
- * {"where": {"column": "cpid", "condition": "=", "value": "1", "and": {"column": "fname", "condition": "=", "value": "ctrl_test1_del"}}}
+ * {"where": {"column": "cpid", "condition": "=", "value": 1, "and": {"column": "fname", "condition": "=", "value": "ctrl_test1_del"}}}
  * @param doc	The new filter table contents
  */
 void ControlPipelineManager::deletePipelineFilter(const Document& doc)
