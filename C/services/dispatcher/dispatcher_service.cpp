@@ -161,13 +161,16 @@ bool DispatcherService::start(string& coreAddress,
 			     managementListener,	// Management port
 			     m_token);			// Token
 
-	if (!m_mgtClient->registerService(record))
+	if (!m_dryRun)
 	{
-		m_logger->fatal("Unable to register service "
-				"\"Dispatcher\" for service '" + m_name + "'");
+		if (!m_mgtClient->registerService(record))
+		{
+			m_logger->fatal("Unable to register service "
+					"\"Dispatcher\" for service '" + m_name + "'");
 
-		this->cleanupResources();
-		return false;
+			this->cleanupResources();
+			return false;
+		}
 	}
 
 	// Make sure we have an instance of the asset tracker
@@ -230,10 +233,13 @@ bool DispatcherService::start(string& coreAddress,
 		m_mgtClient->addChildCategories(m_name, children1);
 	}
 
-	// Register m_name category to Fledge Core
-	registerCategory(m_name);
-	registerCategory(advancedCatName);
-	registerCategory(serverCatName);
+	if (!m_dryRun)
+	{
+		// Register m_name category to Fledge Core
+		registerCategory(m_name);
+		registerCategory(advancedCatName);
+		registerCategory(serverCatName);
+	}
 
 	ConfigCategory serverCategory = m_mgtClient->getCategory(serverCatName);
 	if (serverCategory.itemExists("enable"))
@@ -299,10 +305,13 @@ bool DispatcherService::start(string& coreAddress,
 		m_mgtClient->addAuditEntry("DSPST",
 						"INFORMATION",
 						"{\"name\": \"" + m_name + "\"}");
+	}
 
-		// Create default security category
-		this->createSecurityCategories(m_mgtClient, m_dryRun);
+	// Create default security category
+	this->createSecurityCategories(m_mgtClient, m_dryRun);
 
+	if (!m_dryRun)
+	{
 		// Start the control filter pipeline manager
 		m_pipelineManager = new ControlPipelineManager(m_mgtClient, m_storage);
 		m_pipelineManager->setService(this);
@@ -335,7 +344,7 @@ bool DispatcherService::start(string& coreAddress,
 		// Request the core to restart the service
 		m_mgtClient->restartService();
 	}
-	else if (m_removeFromCore)
+	else if (m_removeFromCore && (!m_dryRun))
 	{
 		// Unregister from storage service
 		m_mgtClient->unregisterService();
