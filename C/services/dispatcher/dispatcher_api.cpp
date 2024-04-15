@@ -49,9 +49,16 @@ DispatcherApi::DispatcherApi(const unsigned short port,
  */
 DispatcherApi::~DispatcherApi()
 {
-	delete m_server;
 	if (m_thread)
+	{
+		stop();
+		wait();
 		delete m_thread;
+	}
+	if (m_server)
+	{
+		delete m_server;
+	}
 }
 
 /**
@@ -87,7 +94,8 @@ void startService()
 /**
  * Start the HTTP server
  */
-void DispatcherApi::start(DispatcherService *service) {
+void DispatcherApi::start(DispatcherService *service)
+{
 	m_service = service;
 	m_thread = new thread(startService);
 }
@@ -95,15 +103,20 @@ void DispatcherApi::start(DispatcherService *service) {
 /**
  * Start method for HTTP server
  */
-void DispatcherApi::startServer() {
+void DispatcherApi::startServer()
+{
 	m_server->start();
 }
 
 /**
  * Stop method for HTTP server
  */
-void DispatcherApi::stopServer() {
-	m_server->stop();
+void DispatcherApi::stopServer()
+{
+	if (m_server)
+	{
+		m_server->stop();
+	}
 }
 
 /**
@@ -117,8 +130,16 @@ void DispatcherApi::stop()
 /**
  * Wait for the HTTP server to shutdown
  */
-void DispatcherApi::wait() {
-	m_thread->join();
+void DispatcherApi::wait()
+{
+	if (m_thread)
+	{
+		try {
+			m_thread->join();
+		} catch (exception& e) {
+			// ignore
+		}
+	}
 }
 
 /**
