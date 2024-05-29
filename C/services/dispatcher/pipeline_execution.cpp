@@ -210,7 +210,7 @@ Reading *PipelineExecutionContext::filter(Reading *reading)
 
 	if (m_plugins.size() == 0)
 	{
-		m_logger->warn("Failed to load pipeline %s", m_name.c_str());
+		m_logger->warn("Failed to load the pipeline %s, no filter is configured for the pipeline.", m_name.c_str());
 		return NULL;
 	}
 
@@ -371,7 +371,7 @@ void PipelineExecutionContext::addFilter(const string& filter, int order)
 	// Make the filter before the new one send to our new filter
 	// To do this we need to call the init routine again, but under
 	// the rules of the filter API the filter must be first shutdown
-	if (order > 0)
+	if (m_plugins.size() > 1)
 	{
 		FilterPlugin *previous = m_plugins[order - 1];
 		previous->shutdown();
