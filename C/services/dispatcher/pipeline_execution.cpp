@@ -379,3 +379,35 @@ void PipelineExecutionContext::addFilter(const string& filter, int order)
 		previous->init(prevConfig, currentPlugin, filterReadingSetFn(passToOnwardFilter));
 	}
 }
+
+/**
+ * Remove a filter from an existing pipeline
+ *
+ * @param filter	The name of the filter to remove from the pipeline
+ */
+void PipelineExecutionContext::removeFilter(const string& filter)
+{
+	// Remove filter from m_filters collection
+	auto it = std::find(m_filters.begin(), m_filters.end(), filter);
+	int index = it-m_filters.begin();
+	if (it != m_filters.end())
+	{
+		m_filters.erase(it);
+
+	}
+
+	// Unregister the filter plugin from pipeline and remove the filter plugin from m_plugins collection
+	m_plugins[index]->shutdown();
+	m_pipelineManager->unregisterCategory(filter, m_plugins[index]);
+	m_plugins.erase(m_plugins.begin()+index);
+	delete (m_plugins[index]);
+
+	// "re-plumb" the pipeline after deletion
+	if (index >= m_plugins.size())
+	{
+		FilterPlugin *previous = m_plugins[index - 1];
+		previous->shutdown();
+		ConfigCategory prevConfig = m_management->getCategory(m_filters[index - 1]);
+		previous->init(prevConfig, (OUTPUT_HANDLE *)this, filterReadingSetFn(useFilteredData));
+	}
+}

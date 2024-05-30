@@ -109,9 +109,22 @@ void ControlPipeline::addFilter(const string& filter, int order)
  */
 void ControlPipeline::removeFilter(const string& filter)
 {
-	// TODO Implement
-	// until this is done simply remove all the active contexts
-	removeAllContexts();
+	lock_guard<mutex> guard(m_contextMutex);
+
+	auto it = std::find(m_pipeline.begin(), m_pipeline.end(), filter);
+	if(it != m_pipeline.end())
+	{
+		m_pipeline.erase(it);
+	}
+
+	if (m_sharedContext)
+	{
+		m_sharedContext->removeFilter(filter);
+	}
+	for (auto &ends : m_contexts)
+	{
+		ends.getContext()->removeFilter(filter);
+	}
 }
 
 /**

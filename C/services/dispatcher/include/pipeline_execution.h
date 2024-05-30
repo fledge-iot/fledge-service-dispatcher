@@ -49,6 +49,7 @@ class PipelineExecutionContext {
 							m_result = result;
 						};
 		void				addFilter(const std::string& filter, int order);
+		void				removeFilter(const std::string& filter);
 	private:
 		bool				loadPipeline();
 		PLUGIN_HANDLE			loadFilterPlugin(const std::string& filterName);
