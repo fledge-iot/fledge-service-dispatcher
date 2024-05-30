@@ -403,7 +403,7 @@ void PipelineExecutionContext::removeFilter(const string& filter)
 	delete (m_plugins[index]);
 
 	// "re-plumb" the pipeline after deletion
-	if (index >= m_plugins.size())
+	if (!m_plugins.empty() && index >= m_plugins.size())
 	{
 		FilterPlugin *previous = m_plugins[index - 1];
 		previous->shutdown();
