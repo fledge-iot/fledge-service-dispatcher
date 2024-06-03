@@ -302,9 +302,7 @@ void PipelineExecutionContext::addFilter(const string& filter, int order)
 	lock_guard<mutex> guard(m_mutex);
 
 	// Add the filter into the pipeline vector
-	auto it = m_filters.begin();
-	it += (order - 1);
-	m_filters.insert(it, filter);
+	m_filters.emplace_back(filter);
 
 	// Get the category with values and defaults
 	ConfigCategory config = m_management->getCategory(filter);
@@ -348,9 +346,7 @@ void PipelineExecutionContext::addFilter(const string& filter, int order)
 				currentPlugin = new FilterPlugin(filterName, filterHandle);
 
 				// Add filter to filters vector
-				auto it = m_plugins.begin();
-				it += (order - 1);
-				m_plugins.insert(it, currentPlugin);
+				m_plugins.emplace_back(currentPlugin);
 			}
 		}
 	}
@@ -362,8 +358,8 @@ void PipelineExecutionContext::addFilter(const string& filter, int order)
 
 	// The filter has been created now we must "re-plumb" the pipeline
 	ConfigCategory updatedCfg = m_management->getCategory(filter);
-	if (order < m_plugins.size() - 1)
-		currentPlugin->init(updatedCfg, m_plugins[order + 1], filterReadingSetFn(passToOnwardFilter));
+	if (m_plugins.size() > 0)
+		currentPlugin->init(updatedCfg, m_plugins[m_plugins.size() - 1], filterReadingSetFn(passToOnwardFilter));
 	else
 		currentPlugin->init(updatedCfg, (OUTPUT_HANDLE *)this, filterReadingSetFn(useFilteredData));
 	m_pipelineManager->registerCategory(filter, currentPlugin);
@@ -373,9 +369,9 @@ void PipelineExecutionContext::addFilter(const string& filter, int order)
 	// the rules of the filter API the filter must be first shutdown
 	if (m_plugins.size() > 1)
 	{
-		FilterPlugin *previous = m_plugins[order - 1];
+		FilterPlugin *previous = m_plugins[m_plugins.size() - 1];
 		previous->shutdown();
-		ConfigCategory prevConfig = m_management->getCategory(m_filters[order - 1]);
+		ConfigCategory prevConfig = m_management->getCategory(m_filters[m_plugins.size() - 1]);
 		previous->init(prevConfig, currentPlugin, filterReadingSetFn(passToOnwardFilter));
 	}
 }
@@ -399,8 +395,8 @@ void PipelineExecutionContext::removeFilter(const string& filter)
 	// Unregister the filter plugin from pipeline and remove the filter plugin from m_plugins collection
 	m_plugins[index]->shutdown();
 	m_pipelineManager->unregisterCategory(filter, m_plugins[index]);
-	m_plugins.erase(m_plugins.begin()+index);
 	delete (m_plugins[index]);
+	m_plugins.erase(m_plugins.begin()+index);
 
 	// "re-plumb" the pipeline after deletion
 	if (!m_plugins.empty() && index >= m_plugins.size())
