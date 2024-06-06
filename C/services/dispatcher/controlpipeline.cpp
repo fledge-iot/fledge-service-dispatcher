@@ -145,6 +145,8 @@ void ControlPipeline::reorder(const string& filter, int order)
 	}
 
 	// An update is required
+	lock_guard<mutex> guard(m_contextMutex);
+
 	for (int currentPosition = 0; currentPosition < m_pipeline.size(); currentPosition++)
 	{
 		if (m_pipeline[currentPosition].compare(filter) == 0)
@@ -152,9 +154,14 @@ void ControlPipeline::reorder(const string& filter, int order)
 			m_pipeline[currentPosition] = m_pipeline[order - 1];
 			m_pipeline[order - 1] = filter;
 
-			// TODO Re-order the pipelines in all the contexts
-			// until this is done simply remove all the active contexts
-			removeAllContexts();
+			if (m_sharedContext)
+			{
+				m_sharedContext->reorder(filter, order);
+			}
+			for (auto &ends : m_contexts)
+			{
+				ends.getContext()->reorder(filter, order);
+			}
 			return;
 		}
 	}

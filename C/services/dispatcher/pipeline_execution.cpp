@@ -289,121 +289,164 @@ void PipelineExecutionContext::useFilteredData(OUTPUT_HANDLE *outHandle,
 }
 
 /**
- * Add a new filter into an exisitng pipeline
+ * Add a new filter into an existing pipeline
  *
- * @param filter	The name of the filter to add to the pipeline
- * @param order		The location in the pipeline for the new filter
+ * @param filter        The name of the filter to add to the pipeline
+ * @param order         The location in the pipeline for the new filter
  */
 void PipelineExecutionContext::addFilter(const string& filter, int order)
 {
-	FilterPlugin *currentPlugin = NULL;
+        FilterPlugin *currentPlugin = NULL;
 
-	// Stop ingestion while adding new filter into pipeline
-	lock_guard<mutex> guard(m_mutex);
+        // Stop ingestion while adding new filter into pipeline
+        lock_guard<mutex> guard(m_mutex);
 
-	// Add the filter into the pipeline vector
-	m_filters.emplace_back(filter);
+        // Add the filter into the pipeline vector
+        auto it = m_filters.begin();
+        it += (order - 1);
+        m_filters.insert(it, filter);
 
-	// Get the category with values and defaults
-	ConfigCategory config = m_management->getCategory(filter);
-	if (config.itemExists("plugin"))
-	{
-		string filterName = config.getValue("plugin");
-		m_logger->debug("Loading the plugin '%s' for filter %s", filterName.c_str(), filter.c_str());
-		PLUGIN_HANDLE filterHandle;
-		// Load filter plugin to obtain a handle that we can use to call the plugin
-		filterHandle = loadFilterPlugin(filterName);
-		if (!filterHandle)
-		{
-			string errMsg("Cannot load filter plugin '" + filterName + "'");
-			m_logger->error(errMsg.c_str());
-			return;
-		}
-		else
-		{
-			PluginManager *pluginManager = PluginManager::getInstance();
-			// Get plugin default configuration
-			string filterConfig = pluginManager->getInfo(filterHandle)->config;
+        // Get the category with values and defaults
+        ConfigCategory config = m_management->getCategory(filter);
+        if (config.itemExists("plugin"))
+        {
+                string filterName = config.getValue("plugin");
+                m_logger->debug("Loading the plugin '%s' for filter %s", filterName.c_str(), filter.c_str());
+				PLUGIN_HANDLE filterHandle;
+                // Load filter plugin to obtain a handle that we can use to call the plugin
+                filterHandle = loadFilterPlugin(filterName);
+                if (!filterHandle)
+                {
+                        string errMsg("Cannot load filter plugin '" + filterName + "'");
+                        m_logger->error(errMsg.c_str());
+                        return;
+                }
+                else
+                {
+                        PluginManager *pluginManager = PluginManager::getInstance();
+                        // Get plugin default configuration
+                        string filterConfig = pluginManager->getInfo(filterHandle)->config;
+                        // Create/Update default filter category items
+                        DefaultConfigCategory filterDefConfig(filter, filterConfig);
+                        string filterDescription = "Configuration of '" + filterName;
+                        filterDescription += "' filter for plugin '" + filter + "'";
+                        filterDefConfig.setDescription(filterDescription);
 
-			// Create/Update default filter category items
-			DefaultConfigCategory filterDefConfig(filter, filterConfig);
-			string filterDescription = "Configuration of '" + filterName;
-			filterDescription += "' filter for plugin '" + filter + "'";
-			filterDefConfig.setDescription(filterDescription);
+                        if (!m_management->addCategory(filterDefConfig, true))
+                        {
+                                string errMsg("Cannot create/update '" + \
+                                              filter + "' filter category");
+                                m_logger->error(errMsg.c_str());
+								return;
+                        }
+                        else
+                        {
 
-			if (!m_management->addCategory(filterDefConfig, true))
-			{
-				string errMsg("Cannot create/update '" + \
-					      filter + "' filter category");
-				m_logger->error(errMsg.c_str());
-				return;
-			}
-			else
-			{
+                                // Instantiate the FilterPlugin class
+                                // in order to call plugin entry points
+                                currentPlugin = new FilterPlugin(filterName, filterHandle);
 
-				// Instantiate the FilterPlugin class
-				// in order to call plugin entry points
-				currentPlugin = new FilterPlugin(filterName, filterHandle);
+                                // Add filter to filters vector
+                                auto it = m_plugins.begin();
+                                it += (order - 1);
+                                m_plugins.insert(it, currentPlugin);
+                        }
+                }
+        }
 
-				// Add filter to filters vector
-				m_plugins.emplace_back(currentPlugin);
-			}
-		}
-	}
+        if (!currentPlugin)
+        {
+                return;
+        }
 
-	if (!currentPlugin)
-	{
-		return;
-	}
+        // The filter has been created now we must "re-plumb" the pipeline
+        ConfigCategory updatedCfg = m_management->getCategory(filter);
+        if (order < m_plugins.size() - 1)
+                currentPlugin->init(updatedCfg, m_plugins[order + 1], filterReadingSetFn(passToOnwardFilter));
+        else
+                currentPlugin->init(updatedCfg, (OUTPUT_HANDLE *)this, filterReadingSetFn(useFilteredData));
+        m_pipelineManager->registerCategory(filter, currentPlugin);
 
-	// The filter has been created now we must "re-plumb" the pipeline
-	ConfigCategory updatedCfg = m_management->getCategory(filter);
-	if (m_plugins.size() > 0)
-		currentPlugin->init(updatedCfg, m_plugins[m_plugins.size() - 1], filterReadingSetFn(passToOnwardFilter));
-	else
-		currentPlugin->init(updatedCfg, (OUTPUT_HANDLE *)this, filterReadingSetFn(useFilteredData));
-	m_pipelineManager->registerCategory(filter, currentPlugin);
-
-	// Make the filter before the new one send to our new filter
-	// To do this we need to call the init routine again, but under
-	// the rules of the filter API the filter must be first shutdown
-	if (m_plugins.size() > 1)
-	{
-		FilterPlugin *previous = m_plugins[m_plugins.size() - 1];
-		previous->shutdown();
-		ConfigCategory prevConfig = m_management->getCategory(m_filters[m_plugins.size() - 1]);
-		previous->init(prevConfig, currentPlugin, filterReadingSetFn(passToOnwardFilter));
-	}
+        // Make the filter before the new one send to our new filter
+        // To do this we need to call the init routine again, but under
+        // the rules of the filter API the filter must be first shutdown
+        if (m_plugins.size() > 1)
+        {
+                FilterPlugin *previous = m_plugins[m_plugins.size() - 1];
+                previous->shutdown();
+                ConfigCategory prevConfig = m_management->getCategory(m_filters[m_plugins.size() - 1]);
+                previous->init(prevConfig, currentPlugin, filterReadingSetFn(passToOnwardFilter));
+        }
 }
 
 /**
  * Remove a filter from an existing pipeline
  *
- * @param filter	The name of the filter to remove from the pipeline
+ * @param filter       The name of the filter to remove from the pipeline
  */
 void PipelineExecutionContext::removeFilter(const string& filter)
 {
-	// Remove filter from m_filters collection
-	auto it = std::find(m_filters.begin(), m_filters.end(), filter);
-	int index = it-m_filters.begin();
-	if (it != m_filters.end())
-	{
-		m_filters.erase(it);
+        // Remove filter from m_filters collection
+        auto it = std::find(m_filters.begin(), m_filters.end(), filter);
+        int index = it-m_filters.begin();
+        if (it != m_filters.end())
+        {
+                m_filters.erase(it);
+        }
+        // Unregister the filter plugin from pipeline and remove the filter plugin from m_plugins collection
+        m_plugins[index]->shutdown();
+        m_pipelineManager->unregisterCategory(filter, m_plugins[index]);
+        delete (m_plugins[index]);
+        m_plugins.erase(m_plugins.begin()+index);
+        // "re-plumb" the pipeline after deletion
+        rePlumbFilters();
+}
 
-	}
+/**
+ * Reorder the named filter within the pipeline
+ *
+ * @param filter        The name of the filter to reorder
+ * @param order         The required position in the pipeline
+ */
+void PipelineExecutionContext::reorder(const std::string& filter, int order)
+{
+        for (int currentPosition = 0; currentPosition < m_filters.size(); currentPosition++)
+        {
+                if (m_filters[currentPosition].compare(filter) == 0)
+                {
+                        // reorder m_filters and m_plugins
+                        m_filters[currentPosition] = m_filters[order - 1];
+                        m_filters[order - 1] = filter;
+                        FilterPlugin *tmp = m_plugins[currentPosition];
+                        m_plugins[currentPosition] = m_plugins[order - 1];
+                        m_plugins[order - 1] = tmp;
+                        rePlumbFilters();
+                }
 
-	// Unregister the filter plugin from pipeline and remove the filter plugin from m_plugins collection
-	m_plugins[index]->shutdown();
-	m_pipelineManager->unregisterCategory(filter, m_plugins[index]);
-	delete (m_plugins[index]);
-	m_plugins.erase(m_plugins.begin()+index);
+        }
 
-	// "re-plumb" the pipeline after deletion
-	if (!m_plugins.empty() && index >= m_plugins.size())
-	{
-		FilterPlugin *previous = m_plugins[index - 1];
-		previous->shutdown();
-		ConfigCategory prevConfig = m_management->getCategory(m_filters[index - 1]);
-		previous->init(prevConfig, (OUTPUT_HANDLE *)this, filterReadingSetFn(useFilteredData));
-	}
+}
+
+/**
+ * Re-plumb filters within the pipeline after change in order
+ *
+ */
+void PipelineExecutionContext::rePlumbFilters()
+{
+        // "re-plumb" the pipeline after reorder
+        int i=0;
+        for (auto it = m_plugins.begin(); it != m_plugins.end(); ++it, ++i)
+        {
+                FilterPlugin *plugin = *it;
+                ConfigCategory updatedCfg = m_management->getCategory(m_filters[i]);
+                plugin->shutdown();
+                if ((it + 1) != m_plugins.end())
+                {
+                        plugin->init(updatedCfg, *(it + 1), filterReadingSetFn(passToOnwardFilter));
+                }
+                else
+                {
+                        plugin->init(updatedCfg, (OUTPUT_HANDLE *)this, filterReadingSetFn(useFilteredData));
+                }
+        }
 }
