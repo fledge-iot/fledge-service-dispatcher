@@ -109,9 +109,22 @@ void ControlPipeline::addFilter(const string& filter, int order)
  */
 void ControlPipeline::removeFilter(const string& filter)
 {
-	// TODO Implement
-	// until this is done simply remove all the active contexts
-	removeAllContexts();
+	lock_guard<mutex> guard(m_contextMutex);
+
+	auto it = std::find(m_pipeline.begin(), m_pipeline.end(), filter);
+	if(it != m_pipeline.end())
+	{
+		m_pipeline.erase(it);
+	}
+
+	if (m_sharedContext)
+	{
+		m_sharedContext->removeFilter(filter);
+	}
+	for (auto &ends : m_contexts)
+	{
+		ends.getContext()->removeFilter(filter);
+	}
 }
 
 /**
@@ -132,6 +145,8 @@ void ControlPipeline::reorder(const string& filter, int order)
 	}
 
 	// An update is required
+	lock_guard<mutex> guard(m_contextMutex);
+
 	for (int currentPosition = 0; currentPosition < m_pipeline.size(); currentPosition++)
 	{
 		if (m_pipeline[currentPosition].compare(filter) == 0)
@@ -139,9 +154,14 @@ void ControlPipeline::reorder(const string& filter, int order)
 			m_pipeline[currentPosition] = m_pipeline[order - 1];
 			m_pipeline[order - 1] = filter;
 
-			// TODO Re-order the pipelines in all the contexts
-			// until this is done simply remove all the active contexts
-			removeAllContexts();
+			if (m_sharedContext)
+			{
+				m_sharedContext->reorder(filter, order);
+			}
+			for (auto &ends : m_contexts)
+			{
+				ends.getContext()->reorder(filter, order);
+			}
 			return;
 		}
 	}
