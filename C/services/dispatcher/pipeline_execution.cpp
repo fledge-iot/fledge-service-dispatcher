@@ -8,6 +8,7 @@
  * Author: Mark Riddoch
  *
  */
+#include <dispatcher_service.h>
 #include <pipeline_execution.h>
 #include <pipeline_manager.h>
 #include <plugin_manager.h>
@@ -45,7 +46,7 @@ PipelineExecutionContext::~PipelineExecutionContext()
 
 	for (int i = 0; i < m_plugins.size(); i++)
 	{
-		m_plugins[i]->shutdown();
+		shutdownPlugin(m_plugins[i]);
 		delete m_plugins[i];
 	}
 
@@ -151,6 +152,13 @@ bool rval = true;
 			plugin->init(updatedCfg, (OUTPUT_HANDLE *)this, filterReadingSetFn(useFilteredData));
 		}
 		m_pipelineManager->registerCategory(m_filters[i], plugin);
+
+		if (plugin->persistData())
+		{
+			plugin->m_plugin_data = new PluginData(m_pipelineManager->getService()->getStorageClient());
+			string pluginStoredData = plugin->m_plugin_data->loadStoredData(m_name + plugin->getName());
+			plugin->startData(pluginStoredData);
+		}
 	}
 
 	if (!rval)
@@ -350,6 +358,12 @@ void PipelineExecutionContext::addFilter(const string& filter, int order)
                                 auto it = m_plugins.begin();
                                 it += (order - 1);
                                 m_plugins.insert(it, currentPlugin);
+				if (currentPlugin->persistData())
+				{
+					currentPlugin->m_plugin_data = new PluginData(m_pipelineManager->getService()->getStorageClient());
+					string pluginStoredData = currentPlugin->m_plugin_data->loadStoredData(m_name + currentPlugin->getName());
+					currentPlugin->startData(pluginStoredData);
+				}
                         }
                 }
         }
@@ -373,7 +387,7 @@ void PipelineExecutionContext::addFilter(const string& filter, int order)
         if (m_plugins.size() > 1)
         {
                 FilterPlugin *previous = m_plugins[m_plugins.size() - 1];
-                previous->shutdown();
+                shutdownPlugin(previous);
                 ConfigCategory prevConfig = m_management->getCategory(m_filters[m_plugins.size() - 1]);
                 previous->init(prevConfig, currentPlugin, filterReadingSetFn(passToOnwardFilter));
         }
@@ -394,7 +408,7 @@ void PipelineExecutionContext::removeFilter(const string& filter)
                 m_filters.erase(it);
         }
         // Unregister the filter plugin from pipeline and remove the filter plugin from m_plugins collection
-        m_plugins[index]->shutdown();
+        shutdownPlugin(m_plugins[index]);
         m_pipelineManager->unregisterCategory(filter, m_plugins[index]);
         delete (m_plugins[index]);
         m_plugins.erase(m_plugins.begin()+index);
@@ -439,7 +453,7 @@ void PipelineExecutionContext::rePlumbFilters()
         {
                 FilterPlugin *plugin = *it;
                 ConfigCategory updatedCfg = m_management->getCategory(m_filters[i]);
-                plugin->shutdown();
+                shutdownPlugin(plugin);
                 if ((it + 1) != m_plugins.end())
                 {
                         plugin->init(updatedCfg, *(it + 1), filterReadingSetFn(passToOnwardFilter));
@@ -449,4 +463,24 @@ void PipelineExecutionContext::rePlumbFilters()
                         plugin->init(updatedCfg, (OUTPUT_HANDLE *)this, filterReadingSetFn(useFilteredData));
                 }
         }
+}
+
+/**
+ * Shutdown the specified plugin and optional save any persisted data
+ *
+ * @param plugin	The plugin to shutdown
+ */
+void PipelineExecutionContext::shutdownPlugin(FilterPlugin *plugin)
+{
+
+	if (plugin->persistData())
+	{
+		string data = plugin->shutdownSaveData();
+		string key(m_name + plugin->getName());
+		plugin->m_plugin_data->persistPluginData(key, data);
+	}
+	else
+	{
+		plugin->shutdown();
+	}
 }

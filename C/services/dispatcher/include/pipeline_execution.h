@@ -55,6 +55,7 @@ class PipelineExecutionContext {
 		void				rePlumbFilters();
 		bool				loadPipeline();
 		PLUGIN_HANDLE			loadFilterPlugin(const std::string& filterName);
+		void				shutdownPlugin(FilterPlugin *plugin);
 
 		static void			passToOnwardFilter(OUTPUT_HANDLE *outHandle, READINGSET* readings);
 		static void			useFilteredData(OUTPUT_HANDLE *outHandle, READINGSET* readings);

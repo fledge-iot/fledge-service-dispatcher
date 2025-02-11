@@ -169,6 +169,7 @@ class ControlPipelineManager {
 						return m_managementClient;
 					}
 		void			setService(DispatcherService *service) { m_dispatcher = service; };
+		DispatcherService	*getService() { return m_dispatcher; };
 
 		void			registerCategory(const std::string& category, FilterPlugin *plugin);
 		void			unregisterCategory(const std::string& category, FilterPlugin *plugin);
