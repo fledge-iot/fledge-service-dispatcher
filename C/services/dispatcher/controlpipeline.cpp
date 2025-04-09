@@ -87,11 +87,13 @@ ControlPipeline::getExecutionContext(const PipelineEndpoint& source, const Pipel
 void ControlPipeline::addFilter(const string& filter, int order)
 {
 	// Add the filter into the pipeline vector
+	lock_guard<mutex> guard(m_contextMutex);	// Stop the context being handed out
+
 	auto it = m_pipeline.begin();
 	it += (order - 1);
 	m_pipeline.insert(it, filter);
+	
 	// Update the contexts that exist for the pipeline
-	lock_guard<mutex> guard(m_contextMutex);	// Stop the context being handed out
 	if (m_sharedContext)
 	{
 		m_sharedContext->addFilter(filter, order);

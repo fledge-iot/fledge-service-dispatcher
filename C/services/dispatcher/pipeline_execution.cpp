@@ -60,6 +60,7 @@ PipelineExecutionContext::loadPipeline()
 bool rval = true;
 
 	m_logger->debug("Load Pipeline %s", m_name.c_str());
+	lock_guard<mutex> guard(m_mutex);
 	try
 	{
 		for (auto& categoryName : m_filters)
