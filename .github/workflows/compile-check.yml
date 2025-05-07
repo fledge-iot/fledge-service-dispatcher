@@ -1,0 +1,35 @@
+name: compile-dispatcher
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  test:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compile Fledge Core
+        id: make_fledge
+        run: |
+          git clone --single-branch -b develop https://github.com/fledge-iot/fledge.git
+          export FLEDGE_ROOT="${{ github.workspace }}/fledge"
+          cd $FLEDGE_ROOT
+          sudo ./requirements.sh
+          make -j$(nproc)
+
+      - name: Compile Dispatcher Service
+        id: make_dispatcher
+        if: steps.make_fledge.outcome == 'success'
+        run: |
+          export FLEDGE_ROOT="${{ github.workspace }}/fledge"
+          mkdir -p build && cd build && cmake .. && make -j$(nproc)
+
