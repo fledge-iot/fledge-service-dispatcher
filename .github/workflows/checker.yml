@@ -1,0 +1,42 @@
+name: Checker
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  test:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+
+    env:
+      FLEDGE_ROOT: ${{ github.workspace }}/fledge
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compile Fledge Core
+        id: make_fledge
+        run: |
+          set -e
+          BRANCH="develop"
+          git clone --single-branch -b "$BRANCH" https://github.com/fledge-iot/fledge.git "$FLEDGE_ROOT"
+          cd "$FLEDGE_ROOT"
+          sudo ./requirements.sh
+          make -j"$(nproc)"
+
+      - name: Compile Dispatcher Service
+        if: steps.make_fledge.outcome == 'success'
+        run: |
+          set -e
+          cd "${{ github.workspace }}"
+          mkdir -p build
+          cd build
+          cmake ..
+          make -j"$(nproc)"
+
