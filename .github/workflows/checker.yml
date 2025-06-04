@@ -24,8 +24,6 @@ jobs:
         id: make_fledge
         run: |
           set -e
-          BRANCH="develop"
-          git clone --single-branch -b "$BRANCH" https://github.com/fledge-iot/fledge.git "$FLEDGE_ROOT"
           echo "⚠️ APT is misinterpreting the mirror+file: scheme as a URL 🌐, causing 404 errors ❌ due to a missing or invalid /etc/apt/apt-mirrors.txt file 📄."
           RELEASE=$(lsb_release -cs)
           echo "Using release: $RELEASE"
@@ -38,7 +36,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --fix-missing
 
-          echo "🔧 Run setup prerequisites 📦 and compilation of code 🛠️"
+          echo "🔧 Run core setup prerequisites 📦 and compilation of code 🛠️"
+          BRANCH="develop"
+          git clone --single-branch -b "$BRANCH" https://github.com/fledge-iot/fledge.git "$FLEDGE_ROOT"
           cd "$FLEDGE_ROOT"
           sudo ./requirements.sh
           make -j"$(nproc)"
