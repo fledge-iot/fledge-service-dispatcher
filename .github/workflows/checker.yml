@@ -37,7 +37,7 @@ jobs:
           sudo apt-get install -y --fix-missing
 
           echo "🔧 Run core setup prerequisites 📦 and compilation of code 🛠️"
-          BRANCH="develop"
+          BRANCH="3.1.0RC"
           git clone --single-branch -b "$BRANCH" https://github.com/fledge-iot/fledge.git "$FLEDGE_ROOT"
           cd "$FLEDGE_ROOT"
           sudo ./requirements.sh
