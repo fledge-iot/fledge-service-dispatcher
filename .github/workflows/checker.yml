@@ -1,0 +1,56 @@
+name: Checker
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  test:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+
+    env:
+      FLEDGE_ROOT: ${{ github.workspace }}/fledge
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compile Fledge Core
+        id: make_fledge
+        run: |
+          set -e
+          echo "⚠️ APT is misinterpreting the mirror+file: scheme as a URL 🌐, causing 404 errors ❌ due to a missing or invalid /etc/apt/apt-mirrors.txt file 📄."
+          RELEASE=$(lsb_release -cs)
+          echo "Using release: $RELEASE"
+          cat <<EOF | sudo tee /etc/apt/sources.list
+          deb http://archive.ubuntu.com/ubuntu $RELEASE main restricted universe multiverse
+          deb http://archive.ubuntu.com/ubuntu $RELEASE-updates main restricted universe multiverse
+          deb http://archive.ubuntu.com/ubuntu $RELEASE-backports main restricted universe multiverse
+          deb http://security.ubuntu.com/ubuntu $RELEASE-security main restricted universe multiverse
+          EOF
+          sudo apt-get update
+          sudo apt-get install -y --fix-missing
+
+          echo "🔧 Run core setup prerequisites 📦 and compilation of code 🛠️"
+          BRANCH="3.1.0RC"
+          git clone --single-branch -b "$BRANCH" https://github.com/fledge-iot/fledge.git "$FLEDGE_ROOT"
+          cd "$FLEDGE_ROOT"
+          sudo ./requirements.sh
+          make -j"$(nproc)"
+
+      - name: Build Service
+        if: steps.make_fledge.outcome == 'success'
+        run: |
+          set -e
+          echo "⚙️ Run compilation of code ⚡"
+          cd "${{ github.workspace }}"
+          mkdir -p build
+          cd build
+          cmake ..
+          make -j"$(nproc)"
+

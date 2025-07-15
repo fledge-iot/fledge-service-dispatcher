@@ -664,7 +664,9 @@ void ControlPipelineManager::updatePipeline(const Document& doc)
 			else if (name.compare("execution") == 0 && column.value.IsString())
 			{
 				string value = column.value.GetString();
-				pipeline->exclusive(value.compare("Shared") == 0 ? false : true);
+				std::transform(value.begin(), value.end(), value.begin(),
+					[](unsigned char c){ return std::tolower(c); });
+				pipeline->exclusive(value.compare("shared") == 0 ? false : true);
 			}
 			// TODO action the endpoint changes
 		}
