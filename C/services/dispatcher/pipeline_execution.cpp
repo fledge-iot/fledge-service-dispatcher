@@ -477,7 +477,7 @@ void PipelineExecutionContext::shutdownPlugin(FilterPlugin *plugin)
 	{
 		string data = plugin->shutdownSaveData();
 		string key(m_name + plugin->getName());
-		plugin->m_plugin_data->persistPluginData(key, data);
+		plugin->m_plugin_data->persistPluginData(key, data, "control");
 	}
 	else
 	{
