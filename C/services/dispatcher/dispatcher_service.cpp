@@ -154,7 +154,7 @@ bool DispatcherService::start(string& coreAddress,
 	unsigned short listenerPort = m_api->getListenerPort();
 	unsigned short managementListener = m_managementApi->getListenerPort();
 	ServiceRecord record(m_name,			// Service name
-			     "Dispatcher",		// Service type
+			     SERVICE_TYPE,		// Service type
 			     "http",			// Protocol
 			     "localhost",		// Listening address
 			     listenerPort,		// Service port
