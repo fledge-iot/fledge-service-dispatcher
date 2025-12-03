@@ -54,6 +54,14 @@ static void signalHandler(int signal)
 	}
 }
 
+// Displays service information in JSON format
+static void printServiceInfoAsJSON()
+{
+	std::string serviceInfoJSON = R"({"name":")" + std::string(SERVICE_NAME) + R"(","description":"Service used to manage and send control information","package":"fledge-service-dispatcher","type":")" + std::string(SERVICE_TYPE) + R"(","process":"dispatcher_c","process_script":"[\"services/dispatcher_c\"]","startup_priority":20})" ;
+
+	std::cout << serviceInfoJSON << std::endl;
+}
+
 /**
  * Dispatcher service main entry point
  */
@@ -75,6 +83,11 @@ int main(int argc, char *argv[])
 
 	for (int i = 1; i < argc; i++)
 	{
+		if (!strcmp(argv[i], "--info"))
+		{
+			printServiceInfoAsJSON();
+			return 0;
+		}
 		if (!strcmp(argv[i], "-d"))
 		{
 			daemonMode = false;
